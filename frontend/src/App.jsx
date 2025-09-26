@@ -258,7 +258,7 @@ function App() {
 
       {/* Navigation Tabs */}
       <div className="px-10 py-8">
-        <div className="flex space-x-3 bg-slate-800/50 rounded-xl p-2">
+        <div className="flex space-x-8 bg-slate-800/50 rounded-xl p-4">
           {[
             { id: 'overview', name: 'Overview' },
             { id: 'analytics', name: 'Analytics' },
