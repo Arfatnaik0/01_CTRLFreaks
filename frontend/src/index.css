@@ -1,7 +1,16 @@
 @import "tailwindcss/preflight";
 @import "tailwindcss/utilities";
 
-/* Custom styles */
+/* Dark Theme Enforcement */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background-color: #0f172a; /* slate-900 */
+  color: #f1f5f9; /* slate-100 */
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -9,11 +18,50 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #0f172a; /* slate-900 */
+  color: #f1f5f9; /* slate-100 */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+/* Ensure all text is readable in dark theme */
+input, textarea, select {
+  background-color: #1e293b; /* slate-800 */
+  color: #f1f5f9; /* slate-100 */
+  border-color: #475569; /* slate-600 */
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+  background-color: #1e293b; /* slate-800 */
+  color: #06b6d4; /* cyan-500 */
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+/* Custom scrollbar for webkit browsers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b; /* slate-800 */
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569; /* slate-600 */
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b; /* slate-500 */
+}
+
+/* Prevent viewport overflow on hover effects */
+.container-safe {
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 /* Loading animations */
