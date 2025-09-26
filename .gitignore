@@ -1,7 +1,0 @@
-
-# ML Model files
-*.pkl
-*.joblib
-*.model
-models/
-__pycache__/
