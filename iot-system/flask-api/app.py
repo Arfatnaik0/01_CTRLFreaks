@@ -5,6 +5,10 @@ import os
 import redis
 from datetime import datetime, timedelta
 import json
+import sys
+
+# Add backend to path for ML imports
+sys.path.append('/workspaces/01_CTRLFreaks/backend')
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -212,6 +216,118 @@ def control_device(device_id):
     
     return jsonify(result)
 
+@app.route('/api/system-stats', methods=['GET'])
+def get_system_stats():
+    """Get comprehensive system statistics"""
+    try:
+        # Get device counts
+        total_devices = db.session.query(Device).count()
+        active_devices = db.session.query(Device).filter(Device.status == 'active').count()
+        
+        # Get alert counts
+        total_alerts = db.session.query(Alert).count()
+        active_alerts = db.session.query(Alert).filter(Alert.is_resolved == False).count()
+        
+        # Get recent sensor data for energy calculation
+        recent_data = db.session.query(SensorData)\
+            .filter(SensorData.timestamp >= datetime.utcnow() - timedelta(days=1))\
+            .all()
+        
+        # Calculate energy consumption (mock calculation)
+        total_energy = sum([reading.current_value * 0.24 for reading in recent_data]) / 1000  # Convert to kWh
+        
+        # Calculate average efficiency (mock calculation)
+        if recent_data:
+            avg_temp = sum([reading.temperature for reading in recent_data]) / len(recent_data)
+            avg_current = sum([reading.current_value for reading in recent_data]) / len(recent_data)
+            efficiency = max(0, min(100, 100 - (avg_temp - 50) * 0.5 - (avg_current - 10) * 0.3))
+        else:
+            efficiency = 85.0
+        
+        # Calculate uptime (mock - assume 99%+ uptime)
+        uptime = 99.2 + (active_devices / total_devices * 0.8) if total_devices > 0 else 99.2
+        
+        # Count data points today
+        today_data = db.session.query(SensorData)\
+            .filter(SensorData.timestamp >= datetime.utcnow().replace(hour=0, minute=0, second=0))\
+            .count()
+        
+        # Count anomalies (alerts created today)
+        today_anomalies = db.session.query(Alert)\
+            .filter(Alert.timestamp >= datetime.utcnow().replace(hour=0, minute=0, second=0))\
+            .count()
+        
+        # Mock maintenance due count
+        maintenance_due = max(0, total_devices - active_devices)
+        
+        stats = {
+            'total_devices': total_devices,
+            'active_devices': active_devices,
+            'total_alerts': total_alerts,
+            'active_alerts': active_alerts,
+            'total_energy_consumption': round(total_energy, 2),
+            'average_efficiency': round(efficiency, 1),
+            'uptime_percentage': round(uptime, 1),
+            'data_points_today': today_data,
+            'anomalies_detected': today_anomalies,
+            'maintenance_due': maintenance_due,
+            'last_updated': datetime.utcnow().isoformat()
+        }
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/energy-data', methods=['GET'])
+def get_energy_data():
+    """Get energy consumption data for charts"""
+    try:
+        # Get time range parameter
+        hours = request.args.get('hours', 24, type=int)
+        start_time = datetime.utcnow() - timedelta(hours=hours)
+        
+        # Query sensor data
+        sensor_data = db.session.query(SensorData)\
+            .filter(SensorData.timestamp >= start_time)\
+            .order_by(SensorData.timestamp.desc())\
+            .limit(100)\
+            .all()
+        
+        # Group by hour and calculate averages
+        hourly_data = {}
+        for reading in sensor_data:
+            hour_key = reading.timestamp.strftime('%H:00')
+            if hour_key not in hourly_data:
+                hourly_data[hour_key] = {
+                    'current': [],
+                    'temperature': [],
+                    'energy': []
+                }
+            hourly_data[hour_key]['current'].append(reading.current_value)
+            hourly_data[hour_key]['temperature'].append(reading.temperature)
+            hourly_data[hour_key]['energy'].append(reading.current_value * 0.24 / 1000)
+        
+        # Calculate averages
+        chart_data = {
+            'labels': [],
+            'current_data': [],
+            'temperature_data': [],
+            'energy_data': []
+        }
+        
+        for hour in sorted(hourly_data.keys()):
+            data = hourly_data[hour]
+            chart_data['labels'].append(hour)
+            chart_data['current_data'].append(round(sum(data['current']) / len(data['current']), 2))
+            chart_data['temperature_data'].append(round(sum(data['temperature']) / len(data['temperature']), 1))
+            chart_data['energy_data'].append(round(sum(data['energy']), 3))
+        
+        return jsonify(chart_data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 def check_database_connection():
     """Check database connectivity"""
     try:
@@ -227,6 +343,62 @@ def check_redis_connection():
         return 'connected'
     except Exception as e:
         return f'error: {str(e)}'
+
+# ML Analytics Routes
+@app.route('/api/ml/analytics', methods=['GET'])
+def get_ml_analytics():
+    """Get comprehensive ML analytics report"""
+    try:
+        from ml_analyzer import IoTMLAnalyzer
+        analyzer = IoTMLAnalyzer()
+        report = analyzer.generate_analytics_report()
+        return jsonify(report)
+    except Exception as e:
+        return jsonify({'error': f'ML analytics error: {str(e)}'}), 500
+
+@app.route('/api/ml/anomalies', methods=['GET'])
+def get_anomalies():
+    """Get recent anomaly detections"""
+    try:
+        from ml_analyzer import IoTMLAnalyzer
+        analyzer = IoTMLAnalyzer()
+        anomalies = analyzer.detect_anomalies()
+        return jsonify({
+            'anomalies': anomalies,
+            'count': len(anomalies),
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': f'Anomaly detection error: {str(e)}'}), 500
+
+@app.route('/api/ml/energy-forecast', methods=['GET'])
+def get_energy_forecast():
+    """Get energy consumption predictions"""
+    try:
+        from ml_analyzer import IoTMLAnalyzer
+        analyzer = IoTMLAnalyzer()
+        forecast = analyzer.predict_energy_consumption(hours_ahead=24)
+        return jsonify({
+            'forecast': forecast,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': f'Energy prediction error: {str(e)}'}), 500
+
+@app.route('/api/ml/maintenance', methods=['GET'])
+def get_maintenance_predictions():
+    """Get predictive maintenance recommendations"""
+    try:
+        from ml_analyzer import IoTMLAnalyzer
+        analyzer = IoTMLAnalyzer()
+        predictions = analyzer.predict_maintenance_needs()
+        return jsonify({
+            'predictions': predictions,
+            'count': len(predictions),
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': f'Maintenance prediction error: {str(e)}'}), 500
 
 if __name__ == '__main__':
     with app.app_context():
