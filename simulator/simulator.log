@@ -1,0 +1,44 @@
+nohup: ignoring input
+2025-09-27 00:03:28,306 - INFO - Initialized fleet of 15 devices
+2025-09-27 00:03:28,307 - INFO - Starting IoT device simulation...
+2025-09-27 00:03:28,331 - INFO - Simulation started with 15 devices
+2025-09-27 00:03:28,332 - INFO - Sending data every 5 seconds to http://127.0.0.1:5001
+2025-09-27 00:03:28,332 - INFO - Press Ctrl+C to stop...
+2025-09-27 00:04:28,332 - INFO - Fleet status: 15/15 active, 15 ON, 0 need maintenance
+2025-09-27 00:05:28,332 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:06:28,333 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:07:28,333 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:08:28,333 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:09:28,334 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:10:28,335 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:11:28,335 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:12:28,335 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:13:28,335 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:14:28,335 - INFO - Fleet status: 15/15 active, 15 ON, 1 need maintenance
+2025-09-27 00:15:28,336 - INFO - Fleet status: 15/15 active, 15 ON, 2 need maintenance
+2025-09-27 00:16:28,336 - INFO - Fleet status: 15/15 active, 15 ON, 2 need maintenance
+2025-09-27 00:17:28,336 - INFO - Fleet status: 15/15 active, 15 ON, 2 need maintenance
+2025-09-27 00:18:28,337 - INFO - Fleet status: 15/15 active, 15 ON, 2 need maintenance
+2025-09-27 00:19:28,337 - INFO - Fleet status: 15/15 active, 15 ON, 2 need maintenance
+2025-09-27 00:20:28,337 - INFO - Fleet status: 15/15 active, 15 ON, 2 need maintenance
+2025-09-27 00:21:28,338 - INFO - Fleet status: 15/15 active, 15 ON, 2 need maintenance
+2025-09-27 00:22:28,341 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:23:28,341 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:24:28,341 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:25:28,341 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:26:28,342 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:27:28,342 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:28:28,342 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:29:28,343 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:30:28,343 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:31:28,343 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:32:28,343 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:33:28,344 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:34:28,344 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:35:28,344 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:36:28,344 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:37:28,345 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:38:28,345 - INFO - Fleet status: 15/15 active, 15 ON, 3 need maintenance
+2025-09-27 00:39:28,345 - INFO - Fleet status: 15/15 active, 15 ON, 4 need maintenance
+2025-09-27 00:40:28,345 - INFO - Fleet status: 15/15 active, 15 ON, 4 need maintenance
+2025-09-27 00:41:28,346 - INFO - Fleet status: 15/15 active, 15 ON, 4 need maintenance
