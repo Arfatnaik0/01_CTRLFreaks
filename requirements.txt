@@ -1,3 +1,6 @@
+# IoT Control Center - Complete Requirements
+# Install with: pip install -r requirements.txt
+
 # Flask Web Framework & Extensions
 Flask>=2.3.0
 Flask-CORS>=4.0.0
@@ -24,3 +27,7 @@ python-dotenv>=1.0.0
 
 # Date & Time Utilities
 python-dateutil>=2.8.2
+
+# Development & Testing (optional)
+pytest>=7.4.0
+black>=23.0.0

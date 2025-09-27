@@ -1,2 +1,8 @@
+# HTTP Requests for API communication
 requests>=2.31.0
-logging
+
+# Data generation and simulation
+numpy>=1.24.0
+
+# Standard library imports (no installation needed)
+# logging, threading, time, random, json are built-in Python modules
