@@ -96,8 +96,7 @@ const Header = () => {
             {user && (
               <div className="flex items-center space-x-4">
                 <div className="hidden sm:block text-sm">
-                  <span className="text-slate-500">Welcome, </span>
-                  <span className="font-medium text-slate-700">{user.username}</span>
+                  <span className="font-medium text-slate-700"></span>
                   {user.role && (
                     <span className="ml-2 text-xs px-2 py-1 bg-blue-100/80 backdrop-blur-sm text-blue-700 rounded-full border border-blue-200/50">
                       {user.role}
@@ -106,7 +105,7 @@ const Header = () => {
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center space-x-2 px-3 py-2 text-sm bg-white/50 backdrop-blur-sm hover:bg-white/70 border border-gray-200/50 rounded-lg transition-all duration-200 shadow-sm"
+                  className="flex items-center space-x-2 px-3 py-2 ml-1.5 text-sm bg-white/50 backdrop-blur-sm hover:bg-white/70 border border-gray-200/50 rounded-lg transition-all duration-200 shadow-sm"
                   title="Logout"
                 >
                   <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
