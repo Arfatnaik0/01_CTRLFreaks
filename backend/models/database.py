@@ -98,11 +98,27 @@ def init_db():
             )
         ''')
         
+        # Create users table for authentication
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash BLOB NOT NULL,
+                role TEXT NOT NULL DEFAULT 'operator',
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                last_login TEXT
+            )
+        ''')
+        
         # Create indexes for better performance
         db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_device_timestamp ON sensor_readings(device_id, timestamp)')
         db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_timestamp ON sensor_readings(timestamp)')
         db.execute('CREATE INDEX IF NOT EXISTS idx_device_status_device_id ON device_status(device_id)')
         db.execute('CREATE INDEX IF NOT EXISTS idx_alerts_device_timestamp ON alerts(device_id, created_at)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
         
         db.commit()
         db.close()
