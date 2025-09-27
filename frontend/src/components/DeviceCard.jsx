@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
+import DeviceDetailsModal from './DeviceDetailsModal';
 
 const DeviceCard = ({ device, onControl }) => {
   const [isControlling, setIsControlling] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [notification, setNotification] = useState(null);
 
   const getDeviceIcon = (type) => {
     const icons = {
@@ -24,18 +27,44 @@ const DeviceCard = ({ device, onControl }) => {
     return 'green';
   };
 
-  const handleToggleRelay = async () => {
+  const handleTurnOff = async () => {
     setIsControlling(true);
     try {
-      // Assume relay is ON if current > 0, otherwise OFF
-      const currentStatus = device.avg_current > 0 ? 'ON' : 'OFF';
-      const newStatus = currentStatus === 'ON' ? 'OFF' : 'ON';
-      await onControl(device.device_id, 'relay', newStatus);
+      // Explicitly turn off the device
+      await onControl(device.device_id, 'relay', 'OFF');
+      
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: `Device ${device.device_id} has been turned off successfully`
+      });
+      
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      
     } catch (error) {
-      console.error('Failed to toggle relay:', error);
+      console.error('Failed to turn off device:', error);
+      
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: `Failed to turn off device ${device.device_id}`
+      });
+      
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      
     } finally {
       setIsControlling(false);
     }
+  };
+
+  const handleViewDetails = () => {
+    setShowDetails(true);
   };
 
   const statusColor = getStatusColor(device);
@@ -46,7 +75,7 @@ const DeviceCard = ({ device, onControl }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+    <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
       <div className="p-6">
         {/* Device Header */}
         <div className="flex items-center justify-between mb-4">
@@ -91,36 +120,32 @@ const DeviceCard = ({ device, onControl }) => {
           </div>
         </div>
 
-        {/* Device Stats */}
-        <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400 mb-4">
-          <div>
-            <span className="font-medium">{device.reading_count || 0}</span> readings
-          </div>
-          <div>
-            Last seen: {device.last_seen ? new Date(device.last_seen).toLocaleTimeString() : 'Unknown'}
-          </div>
-        </div>
-
+        {/* Device Stats - Removed readings and last seen */}
+        
         {/* Control Buttons */}
         <div className="flex space-x-2">
+          {/* Turn Off Button - Only button for device control */}
           <button
-            onClick={handleToggleRelay}
-            disabled={isControlling}
+            onClick={handleTurnOff}
+            disabled={isControlling || device.relay_status === 'OFF' || device.avg_current === 0}
             className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-              device.avg_current > 0
-                ? 'bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300'
-                : 'bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/40 dark:text-green-300'
+              device.relay_status === 'OFF' || device.avg_current === 0
+                ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
+                : 'bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300'
             } disabled:opacity-50`}
+            title={device.relay_status === 'OFF' || device.avg_current === 0 ? 'Device is already off' : 'Turn off device'}
           >
             <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
-            {isControlling ? 'Processing...' : device.avg_current > 0 ? 'Turn Off' : 'Turn On'}
+            {isControlling ? 'Turning Off...' : 'Turn Off'}
           </button>
           
+          {/* View Details Button */}
           <button
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-medium transition-colors duration-200"
-            title="View Details"
+            onClick={handleViewDetails}
+            className="px-4 py-2 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg font-medium transition-colors duration-200"
+            title="View Device Details"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -134,6 +159,44 @@ const DeviceCard = ({ device, onControl }) => {
         statusColor === 'green' ? 'bg-green-400' :
         statusColor === 'yellow' ? 'bg-yellow-400' : 'bg-red-400'
       }`}></div>
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`absolute top-2 left-2 right-2 p-3 rounded-lg shadow-lg z-10 ${
+          notification.type === 'success' 
+            ? 'bg-green-100 border border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300'
+            : 'bg-red-100 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'
+        } animate-fade-in`}
+        >
+          <div className="flex items-center">
+            {notification.type === 'success' ? (
+              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            )}
+            <span className="text-sm font-medium">{notification.message}</span>
+            <button 
+              onClick={() => setNotification(null)}
+              className="ml-auto flex-shrink-0 p-1 hover:bg-opacity-20 hover:bg-black rounded"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Device Details Modal */}
+      <DeviceDetailsModal
+        device={device}
+        isOpen={showDetails}
+        onClose={() => setShowDetails(false)}
+      />
     </div>
   );
 };

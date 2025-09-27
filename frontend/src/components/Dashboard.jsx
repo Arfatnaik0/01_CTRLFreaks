@@ -43,11 +43,18 @@ const Dashboard = () => {
 
   const handleDeviceControl = async (deviceId, command, value) => {
     try {
-      await ApiService.controlDevice(deviceId, command, value);
+      if (command === 'relay') {
+        // Use the dedicated relay toggle API
+        await ApiService.toggleRelay(deviceId, value);
+      } else {
+        // Use the generic control API for other commands
+        await ApiService.controlDevice(deviceId, command, value);
+      }
       // Refresh data after control action
       setTimeout(fetchData, 1000);
     } catch (error) {
       console.error('Control action failed:', error);
+      // You might want to show a toast notification here
     }
   };
 
