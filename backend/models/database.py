@@ -98,11 +98,27 @@ def init_db():
             )
         ''')
         
+        # Create users table for authentication
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash BLOB NOT NULL,
+                role TEXT NOT NULL DEFAULT 'operator',
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                last_login TEXT
+            )
+        ''')
+        
         # Create indexes for better performance
         db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_device_timestamp ON sensor_readings(device_id, timestamp)')
         db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_timestamp ON sensor_readings(timestamp)')
         db.execute('CREATE INDEX IF NOT EXISTS idx_device_status_device_id ON device_status(device_id)')
         db.execute('CREATE INDEX IF NOT EXISTS idx_alerts_device_timestamp ON alerts(device_id, created_at)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
         
         db.commit()
         db.close()
@@ -191,7 +207,7 @@ def get_latest_readings(limit=100):
         logger.error(f"Error getting latest readings: {e}")
         return []
 
-def get_device_readings(device_id, hours=24):
+def get_device_readings(device_id, hours=24, limit=100):
     """Get readings for a specific device"""
     try:
         db = sqlite3.connect('iot_data.db')
@@ -203,7 +219,8 @@ def get_device_readings(device_id, hours=24):
             SELECT * FROM sensor_readings 
             WHERE device_id = ? AND timestamp > ?
             ORDER BY timestamp DESC
-        ''', (device_id, since))
+            LIMIT ?
+        ''', (device_id, since, limit))
         
         readings = [dict(row) for row in cursor.fetchall()]
         db.close()

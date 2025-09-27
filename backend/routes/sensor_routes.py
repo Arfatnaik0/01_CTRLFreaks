@@ -60,14 +60,17 @@ def get_device_data(device_id):
     """Get readings for a specific device"""
     try:
         hours = request.args.get('hours', 24, type=int)
+        limit = request.args.get('limit', 100, type=int)
         hours = min(hours, 168)  # Cap at 1 week
+        limit = min(limit, 1000)  # Cap at 1000 for performance
         
-        readings = get_device_readings(device_id, hours)
+        readings = get_device_readings(device_id, hours, limit)
         
         return jsonify({
             "status": "success",
             "device_id": device_id,
             "hours": hours,
+            "limit": limit,
             "count": len(readings),
             "readings": readings
         }), 200

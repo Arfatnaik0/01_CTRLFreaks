@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { ApiService } from '../services/api';
+import { AuthContext } from '../contexts/AuthContext';
 
-const Header = ({ onToggleDarkMode, darkMode }) => {
+const Header = () => {
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [systemHealth, setSystemHealth] = useState(null);
+  const { user, logout } = useContext(AuthContext);
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -34,6 +36,14 @@ const Header = ({ onToggleDarkMode, darkMode }) => {
       case 'connected': return 'System Online';
       case 'disconnected': return 'System Offline';
       default: return 'Checking...';
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
     }
   };
 
@@ -74,37 +84,38 @@ const Header = ({ onToggleDarkMode, darkMode }) => {
             {systemHealth && (
               <div className="hidden md:flex items-center space-x-4 text-sm">
                 <div className="flex items-center space-x-1">
-                  <span className="text-slate-500 dark:text-slate-400">Database:</span>
-                  <span className={`font-medium ${systemHealth.database === 'healthy' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  <span className="text-slate-500">Database:</span>
+                  <span className={`font-medium ${systemHealth.database === 'healthy' ? 'text-green-600' : 'text-red-600'}`}>
                     {systemHealth.database}
                   </span>
                 </div>
               </div>
             )}
 
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={onToggleDarkMode}
-              className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors duration-200"
-              title="Toggle dark mode"
-            >
-              {darkMode ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-            </button>
-
-            {/* User Menu */}
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                A
+            {/* User Info and Logout */}
+            {user && (
+              <div className="flex items-center space-x-4">
+                <div className="hidden sm:block text-sm">
+                  <span className="text-slate-500">Welcome, </span>
+                  <span className="font-medium text-slate-700">{user.username}</span>
+                  {user.role && (
+                    <span className="ml-2 text-xs px-2 py-1 bg-blue-100/80 backdrop-blur-sm text-blue-700 rounded-full border border-blue-200/50">
+                      {user.role}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center space-x-2 px-3 py-2 text-sm bg-white/50 backdrop-blur-sm hover:bg-white/70 border border-gray-200/50 rounded-lg transition-all duration-200 shadow-sm"
+                  title="Logout"
+                >
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="hidden sm:inline text-gray-700">Logout</span>
+                </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
