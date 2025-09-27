@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import DeviceDetailsModal from './DeviceDetailsModal';
+import ErrorBoundary from './ErrorBoundary';
 
-const DeviceCard = ({ device, onControl }) => {
+const DeviceCard = ({ device, onControl, isTurnedOff = false }) => {
   const [isControlling, setIsControlling] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [isModalOpening, setIsModalOpening] = useState(false);
 
   const getDeviceIcon = (type) => {
     const icons = {
@@ -22,6 +24,11 @@ const DeviceCard = ({ device, onControl }) => {
     const avgCurrent = device.avg_current || 0;
     const avgTemp = device.avg_temperature || 0;
     
+    // Check if device is turned off (either via button or backend)
+    if (isTurnedOff || device.relay_status === 'OFF' || avgCurrent === 0) {
+      return 'gray';
+    }
+    
     if (avgCurrent > 20 || avgTemp > 35) return 'red';
     if (avgCurrent > 15 || avgTemp > 30) return 'yellow';
     return 'green';
@@ -33,7 +40,7 @@ const DeviceCard = ({ device, onControl }) => {
       // Explicitly turn off the device
       await onControl(device.device_id, 'relay', 'OFF');
       
-      // Show success notification
+      // Show success notification (isTurnedOff state is now managed by parent)
       setNotification({
         type: 'success',
         message: `Device ${device.device_id} has been turned off successfully`
@@ -64,14 +71,25 @@ const DeviceCard = ({ device, onControl }) => {
   };
 
   const handleViewDetails = () => {
-    setShowDetails(true);
+    // Prevent multiple modals from opening
+    if (!showDetails && !isModalOpening) {
+      console.log('Opening modal for device:', device.device_id);
+      setIsModalOpening(true);
+      setShowDetails(true);
+      
+      // Reset the opening flag after a short delay
+      setTimeout(() => {
+        setIsModalOpening(false);
+      }, 500);
+    }
   };
 
   const statusColor = getStatusColor(device);
   const statusColors = {
     green: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800',
     yellow: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
-    red: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800'
+    red: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800',
+    gray: 'bg-gray-100 dark:bg-gray-900/20 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-800'
   };
 
   return (
@@ -91,7 +109,7 @@ const DeviceCard = ({ device, onControl }) => {
             </div>
           </div>
           <div className={`px-3 py-1 rounded-full text-xs font-medium border ${statusColors[statusColor]}`}>
-            {statusColor === 'green' ? 'Optimal' : statusColor === 'yellow' ? 'Warning' : 'Critical'}
+            {statusColor === 'green' ? 'Optimal' : statusColor === 'yellow' ? 'Warning' : statusColor === 'red' ? 'Critical' : 'Turned Off'}
           </div>
         </div>
 
@@ -127,23 +145,38 @@ const DeviceCard = ({ device, onControl }) => {
           {/* Turn Off Button - Only button for device control */}
           <button
             onClick={handleTurnOff}
-            disabled={isControlling || device.relay_status === 'OFF' || device.avg_current === 0}
+            disabled={isControlling || device.relay_status === 'OFF' || device.avg_current === 0 || isTurnedOff}
             className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-              device.relay_status === 'OFF' || device.avg_current === 0
+              device.relay_status === 'OFF' || device.avg_current === 0 || isTurnedOff
                 ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
                 : 'bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300'
             } disabled:opacity-50`}
-            title={device.relay_status === 'OFF' || device.avg_current === 0 ? 'Device is already off' : 'Turn off device'}
+            title={
+              isTurnedOff 
+                ? 'Device has been turned off' 
+                : device.relay_status === 'OFF' || device.avg_current === 0 
+                  ? 'Device is already off' 
+                  : 'Turn off device'
+            }
           >
             <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
-            {isControlling ? 'Turning Off...' : 'Turn Off'}
+            {isControlling 
+              ? 'Turning Off...' 
+              : isTurnedOff 
+                ? 'Turned Off' 
+                : 'Turn Off'
+            }
           </button>
           
           {/* View Details Button */}
           <button
-            onClick={handleViewDetails}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleViewDetails();
+            }}
             className="px-4 py-2 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-lg font-medium transition-colors duration-200"
             title="View Device Details"
           >
@@ -157,15 +190,16 @@ const DeviceCard = ({ device, onControl }) => {
       {/* Status Indicator */}
       <div className={`h-2 rounded-b-xl ${
         statusColor === 'green' ? 'bg-green-400' :
-        statusColor === 'yellow' ? 'bg-yellow-400' : 'bg-red-400'
+        statusColor === 'yellow' ? 'bg-yellow-400' : 
+        statusColor === 'red' ? 'bg-red-400' : 'bg-gray-400'
       }`}></div>
 
       {/* Notification Toast */}
       {notification && (
         <div className={`absolute top-2 left-2 right-2 p-3 rounded-lg shadow-lg z-10 ${
           notification.type === 'success' 
-            ? 'bg-green-100 border border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300'
-            : 'bg-red-100 border border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'
+            ? 'bg-green-100 border border-green-300 text-green-800 dark:bg-green-800 dark:border-green-600 dark:text-green-100'
+            : 'bg-red-100 border border-red-300 text-red-800 dark:bg-red-800 dark:border-red-600 dark:text-red-100'
         } animate-fade-in`}
         >
           <div className="flex items-center">
@@ -181,7 +215,7 @@ const DeviceCard = ({ device, onControl }) => {
             <span className="text-sm font-medium">{notification.message}</span>
             <button 
               onClick={() => setNotification(null)}
-              className="ml-auto flex-shrink-0 p-1 hover:bg-opacity-20 hover:bg-black rounded"
+              className="ml-auto flex-shrink-0 p-1 hover:bg-black hover:bg-opacity-10 dark:hover:bg-white dark:hover:bg-opacity-10 rounded"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -192,11 +226,19 @@ const DeviceCard = ({ device, onControl }) => {
       )}
 
       {/* Device Details Modal */}
-      <DeviceDetailsModal
-        device={device}
-        isOpen={showDetails}
-        onClose={() => setShowDetails(false)}
-      />
+      {showDetails && (
+        <ErrorBoundary>
+          <DeviceDetailsModal
+            device={device}
+            isOpen={showDetails}
+            onClose={() => {
+              console.log('Closing modal for device:', device.device_id);
+              setShowDetails(false);
+              setIsModalOpening(false);
+            }}
+          />
+        </ErrorBoundary>
+      )}
     </div>
   );
 };

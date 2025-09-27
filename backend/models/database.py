@@ -191,7 +191,7 @@ def get_latest_readings(limit=100):
         logger.error(f"Error getting latest readings: {e}")
         return []
 
-def get_device_readings(device_id, hours=24):
+def get_device_readings(device_id, hours=24, limit=100):
     """Get readings for a specific device"""
     try:
         db = sqlite3.connect('iot_data.db')
@@ -203,7 +203,8 @@ def get_device_readings(device_id, hours=24):
             SELECT * FROM sensor_readings 
             WHERE device_id = ? AND timestamp > ?
             ORDER BY timestamp DESC
-        ''', (device_id, since))
+            LIMIT ?
+        ''', (device_id, since, limit))
         
         readings = [dict(row) for row in cursor.fetchall()]
         db.close()

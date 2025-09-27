@@ -10,6 +10,37 @@ const Dashboard = () => {
   const [latestReadings, setLatestReadings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [turnedOffDevices, setTurnedOffDevices] = useState(new Set());
+
+  // Helper function to get device status (same logic as DeviceCard)
+  const getDeviceStatus = (device) => {
+    const avgCurrent = device.avg_current || 0;
+    const avgTemp = device.avg_temperature || 0;
+    
+    // Check if device is turned off (manually or by backend)
+    if (turnedOffDevices.has(device.device_id) || device.relay_status === 'OFF' || avgCurrent === 0) {
+      return 'turned-off';
+    }
+    
+    // Check for critical conditions
+    if (avgCurrent > 20 || avgTemp > 35) {
+      return 'critical';
+    }
+    
+    // Check for warning conditions
+    if (avgCurrent > 15 || avgTemp > 30) {
+      return 'warning';
+    }
+    
+    return 'optimal';
+  };
+
+  // Filter devices based on selected status
+  const filteredDevices = devices.filter(device => {
+    if (statusFilter === 'all') return true;
+    return getDeviceStatus(device) === statusFilter;
+  });
 
   useEffect(() => {
     fetchData();
@@ -46,6 +77,17 @@ const Dashboard = () => {
       if (command === 'relay') {
         // Use the dedicated relay toggle API
         await ApiService.toggleRelay(deviceId, value);
+        
+        // Track manually turned off devices
+        if (value === 'OFF') {
+          setTurnedOffDevices(prev => new Set(prev).add(deviceId));
+        } else if (value === 'ON') {
+          setTurnedOffDevices(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(deviceId);
+            return newSet;
+          });
+        }
       } else {
         // Use the generic control API for other commands
         await ApiService.controlDevice(deviceId, command, value);
@@ -82,7 +124,7 @@ const Dashboard = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">
-            IoT Manufacturing Dashboard
+            Surveillance Dashboard
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
             Real-time monitoring and control system
@@ -199,18 +241,81 @@ const Dashboard = () => {
 
       {/* Device Cards */}
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-          Device Status
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {devices.map((device) => (
-            <DeviceCard
-              key={device.device_id}
-              device={device}
-              onControl={handleDeviceControl}
-            />
-          ))}
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+            Device Status
+          </h2>
+          
+          {/* Filter Buttons */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-slate-600 dark:text-slate-400 mr-2">Filter by:</span>
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                statusFilter === 'all'
+                  ? 'bg-slate-600 text-white border-slate-600'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'
+              }`}
+            >
+              All ({devices.length})
+            </button>
+            <button
+              onClick={() => setStatusFilter('warning')}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                statusFilter === 'warning'
+                  ? 'bg-yellow-500 text-white border-yellow-500'
+                  : 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-600 hover:bg-yellow-200 dark:hover:bg-yellow-900/40'
+              }`}
+            >
+              Warning ({devices.filter(d => getDeviceStatus(d) === 'warning').length})
+            </button>
+            <button
+              onClick={() => setStatusFilter('critical')}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                statusFilter === 'critical'
+                  ? 'bg-red-500 text-white border-red-500'
+                  : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600 hover:bg-red-200 dark:hover:bg-red-900/40'
+              }`}
+            >
+              Critical ({devices.filter(d => getDeviceStatus(d) === 'critical').length})
+            </button>
+            <button
+              onClick={() => setStatusFilter('turned-off')}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                statusFilter === 'turned-off'
+                  ? 'bg-gray-500 text-white border-gray-500'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Turned Off ({devices.filter(d => getDeviceStatus(d) === 'turned-off').length})
+            </button>
+          </div>
         </div>
+        
+        {filteredDevices.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">
+              No devices found
+            </p>
+            <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
+              {statusFilter === 'all' ? 'No devices available' : `No devices with ${statusFilter.replace('-', ' ')} status`}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredDevices.map((device) => (
+              <DeviceCard
+                key={device.device_id}
+                device={device}
+                onControl={handleDeviceControl}
+                isTurnedOff={turnedOffDevices.has(device.device_id)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
