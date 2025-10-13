@@ -22,7 +22,9 @@ def create_app():
     CORS(app, supports_credentials=True)  # Enable CORS with credentials for React frontend
     
     # Configuration - use environment variables for production
-    app.config['DATABASE'] = os.environ.get('DATABASE_URL', 'iot_data.db')
+    # Use /tmp directory for SQLite in production (writable on most platforms)
+    default_db_path = '/tmp/iot_data.db' if os.environ.get('FLASK_ENV') == 'production' else 'iot_data.db'
+    app.config['DATABASE'] = os.environ.get('DATABASE_URL', default_db_path)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
     
     # Set Flask environment
@@ -74,12 +76,36 @@ def health():
         db_status = "healthy"
     except Exception as e:
         db_status = f"error: {str(e)}"
+        # Try to initialize database if it doesn't exist
+        try:
+            init_db()
+            db = get_db()
+            db.execute('SELECT 1').fetchone()
+            db_status = "initialized"
+        except Exception as init_error:
+            db_status = f"init_error: {str(init_error)}"
     
     return jsonify({
         "status": "healthy",
         "database": db_status,
         "timestamp": datetime.now().isoformat()
     })
+
+@app.route('/api/init-db')
+def init_database():
+    """Initialize database - useful for production deployment"""
+    try:
+        init_db()
+        return jsonify({
+            "status": "success",
+            "message": "Database initialized successfully",
+            "database_path": app.config['DATABASE']
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Database initialization failed: {str(e)}"
+        }), 500
 
 @app.teardown_appcontext
 def close_db(error):
@@ -89,8 +115,9 @@ def close_db(error):
         db.close()
 
 if __name__ == '__main__':
-    # Initialize database
-    init_db()
+    # Initialize database within app context
+    with app.app_context():
+        init_db()
     
     # Use environment PORT for deployment
     port = int(os.environ.get('PORT', 5001))

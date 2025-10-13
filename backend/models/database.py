@@ -19,7 +19,10 @@ def get_db():
 def init_db():
     """Initialize database with tables"""
     try:
-        db = sqlite3.connect('iot_data.db')
+        # Use the configured database path from Flask config
+        from flask import current_app
+        database_path = current_app.config.get('DATABASE', 'iot_data.db')
+        db = sqlite3.connect(database_path)
         db.row_factory = sqlite3.Row
         
         # Create sensor_readings table
