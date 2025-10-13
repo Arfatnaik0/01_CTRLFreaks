@@ -131,27 +131,31 @@ def _create_tables(db):
 
 def _create_default_users(db):
     """Create default admin user if no users exist"""
-    import bcrypt
-    
-    # Check if any users exist
-    cursor = db.execute('SELECT COUNT(*) as count FROM users')
-    user_count = cursor.fetchone()[0]
-    
-    if user_count == 0:
-        # Create default admin user
-        username = 'admin'
-        email = 'admin@iot-control.com'
-        password = 'admin123'  # Default password
-        role = 'admin'
+    try:
+        import bcrypt
         
-        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        # Check if any users exist
+        cursor = db.execute('SELECT COUNT(*) as count FROM users')
+        user_count = cursor.fetchone()[0]
         
-        db.execute('''
-            INSERT INTO users (username, email, password_hash, role, is_active, created_at)
-            VALUES (?, ?, ?, ?, 1, datetime('now'))
-        ''', (username, email, password_hash, role))
-        
-        logger.info("Created default admin user - username: admin, password: admin123")
+        if user_count == 0:
+            # Create default admin user
+            username = 'admin'
+            email = 'admin@iot-control.com'
+            password = 'admin123'  # Default password
+            role = 'admin'
+            
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            
+            db.execute('''
+                INSERT INTO users (username, email, password_hash, role, is_active, created_at)
+                VALUES (?, ?, ?, ?, 1, datetime('now'))
+            ''', (username, email, password_hash, role))
+            
+            db.commit()  # Ensure the user is saved
+            logger.info("Created default admin user - username: admin, password: admin123")
+    except Exception as e:
+        logger.error(f"Error creating default admin user: {e}")
 
 def init_db():
     """Initialize database with tables"""

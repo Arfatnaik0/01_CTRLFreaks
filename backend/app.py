@@ -128,7 +128,9 @@ def create_admin():
         if existing_admin:
             return jsonify({
                 "status": "exists",
-                "message": "Admin user already exists"
+                "message": "Admin user already exists",
+                "username": existing_admin.username,
+                "role": existing_admin.role
             })
         
         # Create admin user
@@ -149,6 +151,25 @@ def create_admin():
         return jsonify({
             "status": "error",
             "message": f"Failed to create admin user: {str(e)}"
+        }), 500
+
+@app.route('/api/debug-users')
+def debug_users():
+    """Debug endpoint to check user creation"""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('SELECT username, role, created_at FROM users')
+        users = cursor.fetchall()
+        
+        return jsonify({
+            "status": "success",
+            "users": [dict(row) for row in users]
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
         }), 500
 
 @app.teardown_appcontext
