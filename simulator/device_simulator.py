@@ -115,7 +115,7 @@ class IoTDevice:
 class DeviceFleet:
     """Manages a fleet of IoT devices and handles communication with backend"""
     
-    def __init__(self, num_devices: int = 100, backend_url: str = "http://127.0.0.1:5001"):
+    def __init__(self, num_devices: int = 100, backend_url: str = "https://iot-dashboard-09py.onrender.com"):
         self.backend_url = backend_url
         self.devices: List[IoTDevice] = []
         self.running = False
@@ -233,7 +233,7 @@ def main():
     
     parser = argparse.ArgumentParser(description="IoT Device Simulator")
     parser.add_argument("--devices", type=int, default=100, help="Number of devices to simulate")
-    parser.add_argument("--backend", default="http://127.0.0.1:5001", help="Backend URL")
+    parser.add_argument("--backend", default="https://iot-dashboard-09py.onrender.com", help="Backend URL")
     parser.add_argument("--interval", type=int, default=5, help="Data send interval in seconds")
     
     args = parser.parse_args()
