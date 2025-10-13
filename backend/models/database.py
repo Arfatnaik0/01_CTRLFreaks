@@ -129,6 +129,30 @@ def _create_tables(db):
     
     db.commit()
 
+def _create_default_users(db):
+    """Create default admin user if no users exist"""
+    import bcrypt
+    
+    # Check if any users exist
+    cursor = db.execute('SELECT COUNT(*) as count FROM users')
+    user_count = cursor.fetchone()[0]
+    
+    if user_count == 0:
+        # Create default admin user
+        username = 'admin'
+        email = 'admin@iot-control.com'
+        password = 'admin123'  # Default password
+        role = 'admin'
+        
+        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        
+        db.execute('''
+            INSERT INTO users (username, email, password_hash, role, is_active, created_at)
+            VALUES (?, ?, ?, ?, 1, datetime('now'))
+        ''', (username, email, password_hash, role))
+        
+        logger.info("Created default admin user - username: admin, password: admin123")
+
 def init_db():
     """Initialize database with tables"""
     try:
@@ -149,6 +173,7 @@ def init_db():
             db.row_factory = sqlite3.Row
         
         _create_tables(db)
+        _create_default_users(db)
         
         if database_path != ':memory:':
             db.close()

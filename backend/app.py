@@ -102,12 +102,47 @@ def init_database():
         return jsonify({
             "status": "success",
             "message": "Database initialized successfully",
-            "database_path": app.config['DATABASE']
+            "database_path": app.config['DATABASE'],
+            "note": "Default admin user created - username: admin, password: admin123"
         })
     except Exception as e:
         return jsonify({
             "status": "error",
             "message": f"Database initialization failed: {str(e)}"
+        }), 500
+
+@app.route('/api/create-admin')
+def create_admin():
+    """Create default admin user for testing"""
+    try:
+        from models.auth import User
+        
+        # Check if admin already exists
+        existing_admin = User.find_by_username('admin')
+        if existing_admin:
+            return jsonify({
+                "status": "exists",
+                "message": "Admin user already exists"
+            })
+        
+        # Create admin user
+        admin_user = User.create_user(
+            username='admin',
+            email='admin@iot-control.com', 
+            password='admin123',
+            role='admin'
+        )
+        
+        return jsonify({
+            "status": "success",
+            "message": "Admin user created successfully",
+            "username": "admin",
+            "password": "admin123"
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to create admin user: {str(e)}"
         }), 500
 
 @app.teardown_appcontext
