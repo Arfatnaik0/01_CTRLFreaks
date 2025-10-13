@@ -21,12 +21,9 @@ def create_app():
     app = Flask(__name__)
     CORS(app, supports_credentials=True)  # Enable CORS with credentials for React frontend
     
-    # Configuration - use environment variables
-    app.config['DATABASE'] = os.environ.get('DATABASE_URL', 'iot_data.db')
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
-    
-    # Set Flask environment
-    app.config['ENV'] = os.environ.get('FLASK_ENV', 'development')
+    # Configuration
+    app.config['DATABASE'] = 'iot_data.db'
+    app.config['SECRET_KEY'] = secrets.token_hex(16)  # Generate secure secret key
     
     # Initialize Flask-Login
     login_manager = LoginManager()
@@ -92,8 +89,5 @@ if __name__ == '__main__':
     # Initialize database
     init_db()
     
-    # Use environment PORT for deployment
-    port = int(os.environ.get('PORT', 5001))
-    debug = os.environ.get('FLASK_ENV') != 'production'
-    
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    # Run the application
+    app.run(host='127.0.0.1', port=5001, debug=True)
