@@ -36,8 +36,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (username, password) => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://iot-dashboard-09py.onrender.com/api';
     try {
-      const response = await fetch('http://localhost:5001/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,8 +63,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://iot-dashboard-09py.onrender.com/api';
     try {
-      await fetch('http://localhost:5001/api/auth/logout', {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -76,8 +78,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (username, email, password, role = 'operator') => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://iot-dashboard-09py.onrender.com/api';
     try {
-      const response = await fetch('http://localhost:5001/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

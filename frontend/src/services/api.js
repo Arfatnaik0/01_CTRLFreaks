@@ -4,6 +4,7 @@ export class ApiService {
   static async request(endpoint, options = {}) {
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: 'include',  // Include cookies/sessions for CORS
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,

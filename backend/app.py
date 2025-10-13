@@ -19,7 +19,13 @@ logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
-    CORS(app, supports_credentials=True)  # Enable CORS with credentials for React frontend
+    
+    # Configure CORS for cross-origin requests with credentials
+    CORS(app, 
+         supports_credentials=True,
+         origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],  # Allow frontend origins
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization"])
     
     # Configuration - use environment variables for production
     # Use in-memory database for production to avoid file system issues
