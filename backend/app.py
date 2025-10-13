@@ -109,7 +109,7 @@ def init_database():
             "status": "success",
             "message": "Database initialized successfully",
             "database_path": app.config['DATABASE'],
-            "note": "Default admin user created - username: admin, password: admin123"
+            "note": "Default admin user created - username: admin, password: admin"
         })
     except Exception as e:
         return jsonify({

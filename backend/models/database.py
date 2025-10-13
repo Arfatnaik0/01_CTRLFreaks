@@ -142,7 +142,7 @@ def _create_default_users(db):
             # Create default admin user
             username = 'admin'
             email = 'admin@iot-control.com'
-            password = 'admin123'  # Default password
+            password = 'admin'  # Simple default password
             role = 'admin'
             
             password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
