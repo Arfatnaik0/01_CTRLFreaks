@@ -22,9 +22,12 @@ def create_app():
     CORS(app, supports_credentials=True)  # Enable CORS with credentials for React frontend
     
     # Configuration - use environment variables for production
-    # Use /tmp directory for SQLite in production (writable on most platforms)
-    default_db_path = '/tmp/iot_data.db' if os.environ.get('FLASK_ENV') == 'production' else 'iot_data.db'
-    app.config['DATABASE'] = os.environ.get('DATABASE_URL', default_db_path)
+    # Use in-memory database for production to avoid file system issues
+    if os.environ.get('FLASK_ENV') == 'production':
+        app.config['DATABASE'] = ':memory:'  # In-memory SQLite database
+    else:
+        app.config['DATABASE'] = os.environ.get('DATABASE_URL', 'iot_data.db')
+    
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
     
     # Set Flask environment
