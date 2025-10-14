@@ -10,13 +10,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 class User(UserMixin):
-    def __init__(self, id, username, email, password_hash, role='operator', tenant_id='factory_a'):
+    def __init__(self, id, username, email, password_hash, role='operator'):
         self.id = id
         self.username = username
         self.email = email
         self.password_hash = password_hash
         self.role = role
-        self.tenant_id = tenant_id
     
     @staticmethod
     def create_user(username, email, password, role='operator'):
@@ -56,8 +55,7 @@ class User(UserMixin):
                     user_data['username'], 
                     user_data['email'],
                     user_data['password_hash'],
-                    user_data['role'],
-                    user_data['tenant_id'] if 'tenant_id' in user_data.keys() else 'factory_a'
+                    user_data['role']
                 )
             return None
         except Exception as e:
@@ -80,8 +78,7 @@ class User(UserMixin):
                     user_data['username'], 
                     user_data['email'],
                     user_data['password_hash'],
-                    user_data['role'],
-                    user_data['tenant_id'] if 'tenant_id' in user_data.keys() else 'factory_a'
+                    user_data['role']
                 )
             return None
         except Exception as e:
@@ -106,6 +103,5 @@ class User(UserMixin):
             'id': self.id,
             'username': self.username,
             'email': self.email,
-            'role': self.role,
-            'tenant_id': self.tenant_id
+            'role': self.role
         }

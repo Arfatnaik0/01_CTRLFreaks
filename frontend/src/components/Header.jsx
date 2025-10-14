@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { ApiService } from '../services/api';
 import { AuthContext } from '../contexts/AuthContext';
 
-const Header = ({ onViewChange, currentView }) => {
+const Header = () => {
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [systemHealth, setSystemHealth] = useState(null);
   const { user, logout } = useContext(AuthContext);
@@ -68,34 +68,6 @@ const Header = ({ onViewChange, currentView }) => {
                 </p>
               </div>
             </div>
-
-            {/* Navigation */}
-            {user && onViewChange && (
-              <nav className="flex items-center space-x-4 ml-8">
-                <button
-                  onClick={() => onViewChange('dashboard')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentView === 'dashboard'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }`}
-                >
-                  Dashboard
-                </button>
-                {user.role === 'super_admin' && (
-                  <button
-                    onClick={() => onViewChange('super-admin')}
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      currentView === 'super-admin'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
-                  >
-                    Super Admin
-                  </button>
-                )}
-              </nav>
-            )}
           </div>
 
           {/* Status and Controls */}
@@ -124,7 +96,7 @@ const Header = ({ onViewChange, currentView }) => {
             {user && (
               <div className="flex items-center space-x-4">
                 <div className="hidden sm:block text-sm">
-                  <span className="font-medium text-slate-700">{user.username || user.email || 'User'}</span>
+                  <span className="font-medium text-slate-700"></span>
                   {user.role && (
                     <span className="ml-2 text-xs px-2 py-1 bg-blue-100/80 backdrop-blur-sm text-blue-700 rounded-full border border-blue-200/50">
                       {user.role}
