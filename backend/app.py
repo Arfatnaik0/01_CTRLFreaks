@@ -49,6 +49,16 @@ def create_app():
         from models.auth import User
         return User.find_by_id(int(user_id))
     
+    # Auto-initialize database on startup for production
+    if os.environ.get('FLASK_ENV') == 'production':
+        with app.app_context():
+            try:
+                from models.database import init_db
+                init_db()
+                logger.info("Auto-initialized database on startup")
+            except Exception as e:
+                logger.error(f"Database auto-initialization failed: {e}")
+    
     return app
 
 app = create_app()
