@@ -29,27 +29,30 @@ def get_db():
 
 def _create_tables(db):
     """Create all required tables in the database"""
-        # Create sensor_readings table
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS sensor_readings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                device_id TEXT NOT NULL,
-                tenant_id TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                current REAL NOT NULL,
-                temperature REAL NOT NULL,
-                pressure REAL NOT NULL,
-                relay_status TEXT NOT NULL,
-                device_type TEXT NOT NULL,
-                is_active BOOLEAN NOT NULL,
-                maintenance_required BOOLEAN NOT NULL DEFAULT 0,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')    # Create device_status table
+    # Create sensor_readings table
+    db.execute('''
+        CREATE TABLE IF NOT EXISTS sensor_readings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            tenant_id TEXT NOT NULL DEFAULT 'factory_a',
+            timestamp TEXT NOT NULL,
+            current REAL NOT NULL,
+            temperature REAL NOT NULL,
+            pressure REAL NOT NULL,
+            relay_status TEXT NOT NULL,
+            device_type TEXT NOT NULL,
+            is_active BOOLEAN NOT NULL,
+            maintenance_required BOOLEAN NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Create device_status table
     db.execute('''
         CREATE TABLE IF NOT EXISTS device_status (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_id TEXT UNIQUE NOT NULL,
+            tenant_id TEXT NOT NULL DEFAULT 'factory_a',
             last_seen TEXT NOT NULL,
             current_status TEXT NOT NULL,
             relay_status TEXT NOT NULL,
@@ -69,6 +72,7 @@ def _create_tables(db):
         CREATE TABLE IF NOT EXISTS control_commands (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_id TEXT NOT NULL,
+            tenant_id TEXT NOT NULL DEFAULT 'factory_a',
             command_type TEXT NOT NULL,
             command_data TEXT,
             status TEXT DEFAULT 'pending',
@@ -93,6 +97,7 @@ def _create_tables(db):
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_id TEXT NOT NULL,
+            tenant_id TEXT NOT NULL DEFAULT 'factory_a',
             alert_type TEXT NOT NULL,
             severity TEXT NOT NULL,
             message TEXT NOT NULL,
@@ -104,23 +109,23 @@ def _create_tables(db):
         )
     ''')
     
-        # Create users table for authentication
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash BLOB NOT NULL,
-                role TEXT NOT NULL DEFAULT 'operator',
-                tenant_id TEXT NOT NULL DEFAULT 'default',
-                is_active BOOLEAN NOT NULL DEFAULT 1,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                last_login TEXT
-            )
-        ''')
-        
-        # Create tenants table for factory management
-        db.execute('''
+    # Create users table for authentication
+    db.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash BLOB NOT NULL,
+            role TEXT NOT NULL DEFAULT 'operator',
+            tenant_id TEXT NOT NULL DEFAULT 'factory_a',
+            is_active BOOLEAN NOT NULL DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_login TEXT
+        )
+    ''')
+    
+    # Create tenants table for factory management
+    db.execute('''
             CREATE TABLE IF NOT EXISTS tenants (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -130,13 +135,51 @@ def _create_tables(db):
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 settings TEXT DEFAULT '{}'
             )
-        ''')    # Create indexes for better performance
+    ''')
+    
+    # Add tenant_id columns to existing tables if they don't exist
+    try:
+        db.execute('ALTER TABLE sensor_readings ADD COLUMN tenant_id TEXT DEFAULT "factory_a"')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    try:
+        db.execute('ALTER TABLE device_status ADD COLUMN tenant_id TEXT DEFAULT "factory_a"')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    try:
+        db.execute('ALTER TABLE users ADD COLUMN tenant_id TEXT DEFAULT "factory_a"')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    try:
+        db.execute('ALTER TABLE alerts ADD COLUMN tenant_id TEXT DEFAULT "factory_a"')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+        
+    try:
+        db.execute('ALTER TABLE control_commands ADD COLUMN tenant_id TEXT DEFAULT "factory_a"')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    # Create indexes for better performance
     db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_device_timestamp ON sensor_readings(device_id, timestamp)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_timestamp ON sensor_readings(timestamp)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_device_status_device_id ON device_status(device_id)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_alerts_device_timestamp ON alerts(device_id, created_at)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
+    
+    # Create tenant indexes only if columns exist
+    try:
+        db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_tenant ON sensor_readings(tenant_id)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_device_status_tenant ON device_status(tenant_id)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_alerts_tenant ON alerts(tenant_id)')
+        db.execute('CREATE INDEX IF NOT EXISTS idx_control_commands_tenant ON control_commands(tenant_id)')
+    except sqlite3.OperationalError:
+        pass  # Columns might not exist yet
     
     db.commit()
 
@@ -202,27 +245,29 @@ def init_db():
 def insert_sensor_reading(data):
     """Insert a new sensor reading"""
     try:
-        db = sqlite3.connect('iot_data.db')
+        db = get_db()
         
-        # Insert sensor reading
+        # Insert sensor reading with tenant_id
         db.execute('''
             INSERT INTO sensor_readings 
-            (device_id, timestamp, current, temperature, pressure, relay_status, 
+            (device_id, tenant_id, timestamp, current, temperature, pressure, relay_status, 
              device_type, is_active, maintenance_required)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            data['device_id'], data['timestamp'], data['current'],
+            data['device_id'], data.get('tenant_id', 'factory_a'), data['timestamp'], data['current'],
             data['temperature'], data['pressure'], data['relay_status'],
             data['device_type'], data['is_active'], data['maintenance_required']
         ))
         
-        # Update or insert device status
+        # Update or insert device status with tenant_id
+        tenant_id = data.get('tenant_id', 'factory_a')
         db.execute('''
             INSERT OR REPLACE INTO device_status
-            (device_id, last_seen, current_status, relay_status, device_type, 
+            (device_id, tenant_id, last_seen, current_status, relay_status, device_type, 
              is_active, maintenance_required, total_readings, avg_current, 
              avg_temperature, avg_pressure, updated_at)
             SELECT 
+                ?,
                 ?,
                 ?,
                 CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
@@ -230,20 +275,20 @@ def insert_sensor_reading(data):
                 ?,
                 ?,
                 ?,
-                COALESCE((SELECT total_readings FROM device_status WHERE device_id = ?), 0) + 1,
-                (COALESCE((SELECT avg_current * total_readings FROM device_status WHERE device_id = ?), 0) + ?) / 
-                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ?), 0) + 1),
-                (COALESCE((SELECT avg_temperature * total_readings FROM device_status WHERE device_id = ?), 0) + ?) / 
-                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ?), 0) + 1),
-                (COALESCE((SELECT avg_pressure * total_readings FROM device_status WHERE device_id = ?), 0) + ?) / 
-                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ?), 0) + 1),
+                COALESCE((SELECT total_readings FROM device_status WHERE device_id = ? AND tenant_id = ?), 0) + 1,
+                (COALESCE((SELECT avg_current * total_readings FROM device_status WHERE device_id = ? AND tenant_id = ?), 0) + ?) / 
+                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ? AND tenant_id = ?), 0) + 1),
+                (COALESCE((SELECT avg_temperature * total_readings FROM device_status WHERE device_id = ? AND tenant_id = ?), 0) + ?) / 
+                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ? AND tenant_id = ?), 0) + 1),
+                (COALESCE((SELECT avg_pressure * total_readings FROM device_status WHERE device_id = ? AND tenant_id = ?), 0) + ?) / 
+                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ? AND tenant_id = ?), 0) + 1),
                 ?
         ''', (
-            data['device_id'], data['timestamp'], data['is_active'], data['relay_status'],
+            data['device_id'], tenant_id, data['timestamp'], data['is_active'], data['relay_status'],
             data['device_type'], data['is_active'], data['maintenance_required'],
-            data['device_id'], data['device_id'], data['current'], data['device_id'],
-            data['device_id'], data['temperature'], data['device_id'],
-            data['device_id'], data['pressure'], data['device_id'],
+            data['device_id'], tenant_id, data['device_id'], tenant_id, data['current'], data['device_id'], tenant_id,
+            data['device_id'], tenant_id, data['temperature'], data['device_id'], tenant_id,
+            data['device_id'], tenant_id, data['pressure'], data['device_id'], tenant_id,
             datetime.now().isoformat()
         ))
         
