@@ -28,11 +28,12 @@ def create_app():
          allow_headers=["Content-Type", "Authorization"])
     
     # Configuration - use environment variables for production
-    # Use in-memory database for production to avoid file system issues
-    if os.environ.get('FLASK_ENV') == 'production':
-        app.config['DATABASE'] = ':memory:'  # In-memory SQLite database
-    else:
-        app.config['DATABASE'] = os.environ.get('DATABASE_URL', 'iot_data.db')
+    # Use file-based database for production reliability on Render
+    app.config['DATABASE'] = os.environ.get('DATABASE_URL', 'iot_data.db')
+    
+    # For Render deployment, use /tmp directory for database
+    if 'onrender.com' in os.environ.get('RENDER_EXTERNAL_URL', ''):
+        app.config['DATABASE'] = '/tmp/iot_data.db'
     
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
     
@@ -49,17 +50,22 @@ def create_app():
         from models.auth import User
         return User.find_by_id(int(user_id))
     
-    # Auto-initialize database on startup for production
-    if os.environ.get('FLASK_ENV') == 'production':
-        with app.app_context():
+    # Auto-initialize database on startup for production (always initialize for Render)
+    with app.app_context():
+        try:
+            from models.database import init_db
+            from models.tenant import TenantManager
+            init_db()
+            TenantManager.create_tenant_system()
+            logger.info("Auto-initialized database and tenant system on startup")
+        except Exception as e:
+            logger.error(f"Database auto-initialization failed: {e}")
+            # Try one more time with clean initialization
             try:
-                from models.database import init_db
-                from models.tenant import TenantManager
                 init_db()
-                TenantManager.create_tenant_system()
-                logger.info("Auto-initialized database and tenant system on startup")
-            except Exception as e:
-                logger.error(f"Database auto-initialization failed: {e}")
+                logger.info("Database initialized successfully on retry")
+            except Exception as retry_error:
+                logger.error(f"Database retry failed: {retry_error}")
     
     return app
 

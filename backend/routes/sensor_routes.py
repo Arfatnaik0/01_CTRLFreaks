@@ -14,7 +14,7 @@ sensor_bp = Blueprint('sensor', __name__)
 
 @sensor_bp.route('/sensor-data', methods=['POST'])
 def receive_sensor_data():
-    """Receive sensor data from IoT devices"""
+    """Receive sensor data from IoT devices with robust error handling"""
     try:
         data = request.get_json()
         
@@ -31,16 +31,36 @@ def receive_sensor_data():
         tenant_id = data.get('tenant_id', 'factory_a')
         data['tenant_id'] = tenant_id
         
-        # Insert into database with tenant isolation
-        if insert_sensor_reading(data):
-            logger.debug(f"Sensor data received from device {data['device_id']} for tenant {tenant_id}")
-            return jsonify({"status": "success", "message": "Data received"}), 200
-        else:
-            return jsonify({"error": "Failed to store data"}), 500
+        # Ensure all required fields have default values
+        data.setdefault('relay_status', 'ON')
+        data.setdefault('device_type', 'generic')
+        data.setdefault('is_active', True)
+        data.setdefault('maintenance_required', False)
+        
+        # Try to insert into database with error recovery
+        try:
+            if insert_sensor_reading(data):
+                logger.debug(f"Sensor data received from device {data['device_id']} for tenant {tenant_id}")
+                return jsonify({"status": "success", "message": "Data received", "tenant_id": tenant_id}), 200
+            else:
+                return jsonify({"error": "Failed to store data"}), 500
+        except Exception as db_error:
+            logger.error(f"Database error: {db_error}")
+            # Try to reinitialize database and retry
+            try:
+                from models.database import init_db
+                init_db()
+                if insert_sensor_reading(data):
+                    logger.info("Database reinitialized and data stored successfully")
+                    return jsonify({"status": "success", "message": "Data received after DB recovery", "tenant_id": tenant_id}), 200
+            except Exception as retry_error:
+                logger.error(f"Database recovery failed: {retry_error}")
+            
+            return jsonify({"error": "Database temporarily unavailable"}), 503
     
     except Exception as e:
         logger.error(f"Error receiving sensor data: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @sensor_bp.route('/latest-readings', methods=['GET'])
 @login_required

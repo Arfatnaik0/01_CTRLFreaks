@@ -10,21 +10,27 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 def get_db():
-    """Get database connection"""
-    if not hasattr(g, 'sqlite_db'):
-        database_path = current_app.config['DATABASE']
-        if database_path == ':memory:':
-            # For in-memory database, we need to ensure it's initialized
-            if not hasattr(current_app, '_memory_db'):
-                current_app._memory_db = sqlite3.connect(':memory:', check_same_thread=False)
-                current_app._memory_db.row_factory = sqlite3.Row
-                # Initialize tables immediately for in-memory database
-                with current_app.app_context():
-                    _create_tables(current_app._memory_db)
-            g.sqlite_db = current_app._memory_db
-        else:
-            g.sqlite_db = sqlite3.connect(database_path)
+    """Get database connection with robust error handling"""
+    if not hasattr(g, 'sqlite_db') or g.sqlite_db is None:
+        try:
+            database_path = current_app.config.get('DATABASE', 'iot_data.db')
+            g.sqlite_db = sqlite3.connect(database_path, timeout=30.0)
             g.sqlite_db.row_factory = sqlite3.Row
+            
+            # Enable WAL mode for better concurrency
+            g.sqlite_db.execute('PRAGMA journal_mode=WAL')
+            g.sqlite_db.execute('PRAGMA synchronous=NORMAL')
+            g.sqlite_db.execute('PRAGMA cache_size=10000')
+            g.sqlite_db.execute('PRAGMA temp_store=MEMORY')
+            
+        except Exception as e:
+            logger.error(f"Database connection error: {e}")
+            # Fallback to in-memory database
+            g.sqlite_db = sqlite3.connect(':memory:')
+            g.sqlite_db.row_factory = sqlite3.Row
+            # Initialize tables for fallback database
+            _create_tables(g.sqlite_db)
+            
     return g.sqlite_db
 
 def _create_tables(db):
@@ -293,12 +299,19 @@ def insert_sensor_reading(data):
         ))
         
         db.commit()
-        db.close()
         
         return True
         
     except Exception as e:
         logger.error(f"Error inserting sensor reading: {e}")
+        # Try to recover by reinitializing tables
+        try:
+            db = get_db()
+            _create_tables(db)
+            db.commit()
+            logger.info("Tables reinitialized after error")
+        except Exception as recovery_error:
+            logger.error(f"Table recovery failed: {recovery_error}")
         return False
 
 def get_latest_readings(limit=100):
