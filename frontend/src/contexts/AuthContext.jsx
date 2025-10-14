@@ -14,7 +14,8 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/auth/check', {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://iot-dashboard-09py.onrender.com/api';
+      const response = await fetch(`${API_BASE_URL}/auth/check`, {
         credentials: 'include'
       });
       const data = await response.json();

@@ -124,7 +124,7 @@ const Header = ({ onViewChange, currentView }) => {
             {user && (
               <div className="flex items-center space-x-4">
                 <div className="hidden sm:block text-sm">
-                  <span className="font-medium text-slate-700"></span>
+                  <span className="font-medium text-slate-700">{user.username || user.email || 'User'}</span>
                   {user.role && (
                     <span className="ml-2 text-xs px-2 py-1 bg-blue-100/80 backdrop-blur-sm text-blue-700 rounded-full border border-blue-200/50">
                       {user.role}
