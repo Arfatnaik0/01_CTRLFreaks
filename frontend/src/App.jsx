@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Dashboard from './components/Dashboard'
 import Header from './components/Header'
+import SuperAdminPanel from './components/SuperAdminPanel'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './contexts/AuthContext'
 import { ApiService } from './services/api'
@@ -10,6 +11,7 @@ function App() {
   const [isConnected, setIsConnected] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [error, setError] = useState(null)
+  const [currentView, setCurrentView] = useState('dashboard')
 
   // Check backend connection on startup
   useEffect(() => {
@@ -98,8 +100,9 @@ function App() {
     <AuthProvider>
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-gray-800 via-gray-700 to-slate-800">
-          <Header />
-          <Dashboard />
+          <Header onViewChange={setCurrentView} currentView={currentView} />
+          {currentView === 'dashboard' && <Dashboard />}
+          {currentView === 'super-admin' && <SuperAdminPanel />}
         </div>
       </ProtectedRoute>
     </AuthProvider>

@@ -1,11 +1,13 @@
 """
 Sensor data routes for IoT backend
-Handles incoming sensor data and device status
+Handles incoming sensor data and device status with multi-tenant support
 """
 
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, g
+from flask_login import login_required, current_user
 import logging
-from models.database import insert_sensor_reading, get_latest_readings, get_device_readings, get_all_device_status
+from models.database import insert_sensor_reading, get_latest_readings, get_device_readings, get_all_device_status, get_db
+from models.tenant import TenantMiddleware
 
 logger = logging.getLogger(__name__)
 sensor_bp = Blueprint('sensor', __name__)
@@ -25,9 +27,13 @@ def receive_sensor_data():
             if field not in data:
                 return jsonify({"error": f"Missing required field: {field}"}), 400
         
-        # Insert into database
+        # Get tenant_id from request or default to factory_a for simulator
+        tenant_id = data.get('tenant_id', 'factory_a')
+        data['tenant_id'] = tenant_id
+        
+        # Insert into database with tenant isolation
         if insert_sensor_reading(data):
-            logger.debug(f"Sensor data received from device {data['device_id']}")
+            logger.debug(f"Sensor data received from device {data['device_id']} for tenant {tenant_id}")
             return jsonify({"status": "success", "message": "Data received"}), 200
         else:
             return jsonify({"error": "Failed to store data"}), 500
@@ -37,16 +43,33 @@ def receive_sensor_data():
         return jsonify({"error": "Internal server error"}), 500
 
 @sensor_bp.route('/latest-readings', methods=['GET'])
+@login_required
 def get_latest():
-    """Get latest sensor readings"""
+    """Get latest sensor readings for current tenant"""
     try:
         limit = request.args.get('limit', 100, type=int)
         limit = min(limit, 1000)  # Cap at 1000 for performance
         
-        readings = get_latest_readings(limit)
+        # Get tenant-specific readings
+        tenant_id = getattr(current_user, 'tenant_id', 'factory_a')
+        
+        # Override for super admin to see all data
+        if getattr(current_user, 'role', '') == 'super_admin':
+            readings = get_latest_readings(limit)
+        else:
+            # Get tenant-specific readings
+            db = get_db()
+            cursor = db.execute('''
+                SELECT * FROM sensor_readings 
+                WHERE tenant_id = ?
+                ORDER BY timestamp DESC 
+                LIMIT ?
+            ''', (tenant_id, limit))
+            readings = [dict(row) for row in cursor.fetchall()]
         
         return jsonify({
             "status": "success",
+            "tenant_id": tenant_id,
             "count": len(readings),
             "readings": readings
         }), 200

@@ -54,8 +54,10 @@ def create_app():
         with app.app_context():
             try:
                 from models.database import init_db
+                from models.tenant import TenantManager
                 init_db()
-                logger.info("Auto-initialized database on startup")
+                TenantManager.create_tenant_system()
+                logger.info("Auto-initialized database and tenant system on startup")
             except Exception as e:
                 logger.error(f"Database auto-initialization failed: {e}")
     
@@ -69,12 +71,14 @@ from routes.sensor_routes import sensor_bp
 from routes.analytics_routes import analytics_bp
 from routes.control_routes import control_bp
 from routes.auth_routes import auth_bp
+from routes.super_admin_routes import super_admin_bp
 
 # Register blueprints
 app.register_blueprint(sensor_bp, url_prefix='/api')
 app.register_blueprint(analytics_bp, url_prefix='/api')
 app.register_blueprint(control_bp, url_prefix='/api')
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(super_admin_bp, url_prefix='/api/super-admin')
 
 @app.route('/')
 def index():
@@ -112,14 +116,20 @@ def health():
 
 @app.route('/api/init-db')
 def init_database():
-    """Initialize database - useful for production deployment"""
+    """Initialize database with multi-tenant support - useful for production deployment"""
     try:
+        from models.tenant import TenantManager
         init_db()
+        TenantManager.create_tenant_system()
         return jsonify({
             "status": "success",
-            "message": "Database initialized successfully",
+            "message": "Database and tenant system initialized successfully",
             "database_path": app.config['DATABASE'],
-            "note": "Default admin user created - username: admin, password: admin"
+            "credentials": {
+                "super_admin": "superadmin / superadmin123",
+                "factory_admins": "admin_a, admin_b, admin_c, admin_d / factory123",
+                "legacy_admin": "admin / admin (for backward compatibility)"
+            }
         })
     except Exception as e:
         return jsonify({

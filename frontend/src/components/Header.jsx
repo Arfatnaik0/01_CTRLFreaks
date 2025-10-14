@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { ApiService } from '../services/api';
 import { AuthContext } from '../contexts/AuthContext';
 
-const Header = () => {
+const Header = ({ onViewChange, currentView }) => {
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [systemHealth, setSystemHealth] = useState(null);
   const { user, logout } = useContext(AuthContext);
@@ -68,6 +68,34 @@ const Header = () => {
                 </p>
               </div>
             </div>
+
+            {/* Navigation */}
+            {user && onViewChange && (
+              <nav className="flex items-center space-x-4 ml-8">
+                <button
+                  onClick={() => onViewChange('dashboard')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    currentView === 'dashboard'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  Dashboard
+                </button>
+                {user.role === 'super_admin' && (
+                  <button
+                    onClick={() => onViewChange('super-admin')}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      currentView === 'super-admin'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    Super Admin
+                  </button>
+                )}
+              </nav>
+            )}
           </div>
 
           {/* Status and Controls */}

@@ -115,8 +115,9 @@ class IoTDevice:
 class DeviceFleet:
     """Manages a fleet of IoT devices and handles communication with backend"""
     
-    def __init__(self, num_devices: int = 100, backend_url: str = "https://iot-dashboard-09py.onrender.com"):
+    def __init__(self, num_devices: int = 100, backend_url: str = "https://iot-dashboard-09py.onrender.com", tenant_id: str = "factory_a"):
         self.backend_url = backend_url
+        self.tenant_id = tenant_id
         self.devices: List[IoTDevice] = []
         self.running = False
         self.send_interval = 5  # seconds between readings
@@ -135,6 +136,8 @@ class DeviceFleet:
         """Send sensor data to backend API"""
         try:
             readings = device.generate_sensor_readings()
+            # Add tenant_id to readings
+            readings['tenant_id'] = self.tenant_id
             response = requests.post(
                 f"{self.backend_url}/api/sensor-data",
                 json=readings,
@@ -235,18 +238,20 @@ def main():
     parser.add_argument("--devices", type=int, default=100, help="Number of devices to simulate")
     parser.add_argument("--backend", default="https://iot-dashboard-09py.onrender.com", help="Backend URL")
     parser.add_argument("--interval", type=int, default=5, help="Data send interval in seconds")
+    parser.add_argument("--tenant", default="factory_a", choices=["factory_a", "factory_b", "factory_c", "factory_d"], 
+                        help="Tenant/Factory ID for multi-tenant simulation")
     
     args = parser.parse_args()
     
     # Create device fleet
-    fleet = DeviceFleet(num_devices=args.devices, backend_url=args.backend)
+    fleet = DeviceFleet(num_devices=args.devices, backend_url=args.backend, tenant_id=args.tenant)
     fleet.send_interval = args.interval
     
     try:
         # Start simulation
         threads = fleet.start_simulation()
         
-        logger.info(f"Simulation started with {args.devices} devices")
+        logger.info(f"Simulation started with {args.devices} devices for tenant: {args.tenant}")
         logger.info(f"Sending data every {args.interval} seconds to {args.backend}")
         logger.info("Press Ctrl+C to stop...")
         

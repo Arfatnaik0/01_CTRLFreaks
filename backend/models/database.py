@@ -29,24 +29,23 @@ def get_db():
 
 def _create_tables(db):
     """Create all required tables in the database"""
-    # Create sensor_readings table
-    db.execute('''
-        CREATE TABLE IF NOT EXISTS sensor_readings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_id TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            current REAL NOT NULL,
-            temperature REAL NOT NULL,
-            pressure REAL NOT NULL,
-            relay_status TEXT NOT NULL,
-            device_type TEXT NOT NULL,
-            is_active BOOLEAN NOT NULL,
-            maintenance_required BOOLEAN NOT NULL DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Create device_status table
+        # Create sensor_readings table
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS sensor_readings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                current REAL NOT NULL,
+                temperature REAL NOT NULL,
+                pressure REAL NOT NULL,
+                relay_status TEXT NOT NULL,
+                device_type TEXT NOT NULL,
+                is_active BOOLEAN NOT NULL,
+                maintenance_required BOOLEAN NOT NULL DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')    # Create device_status table
     db.execute('''
         CREATE TABLE IF NOT EXISTS device_status (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,21 +104,33 @@ def _create_tables(db):
         )
     ''')
     
-    # Create users table for authentication
-    db.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash BLOB NOT NULL,
-            role TEXT NOT NULL DEFAULT 'operator',
-            is_active BOOLEAN NOT NULL DEFAULT 1,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            last_login TEXT
-        )
-    ''')
-    
-    # Create indexes for better performance
+        # Create users table for authentication
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash BLOB NOT NULL,
+                role TEXT NOT NULL DEFAULT 'operator',
+                tenant_id TEXT NOT NULL DEFAULT 'default',
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                last_login TEXT
+            )
+        ''')
+        
+        # Create tenants table for factory management
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS tenants (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                admin_email TEXT,
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                settings TEXT DEFAULT '{}'
+            )
+        ''')    # Create indexes for better performance
     db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_device_timestamp ON sensor_readings(device_id, timestamp)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_sensor_timestamp ON sensor_readings(timestamp)')
     db.execute('CREATE INDEX IF NOT EXISTS idx_device_status_device_id ON device_status(device_id)')
