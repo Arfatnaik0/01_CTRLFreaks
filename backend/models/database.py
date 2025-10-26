@@ -203,21 +203,43 @@ def init_db():
         raise
 
 def insert_sensor_reading(data):
-    """Insert a new sensor reading with manual override support"""
+    """Insert a new sensor reading with manual override support (optimized)"""
     try:
-        db = sqlite3.connect('iot_data.db')
+        db = sqlite3.connect('iot_data.db', timeout=10)
         db.row_factory = sqlite3.Row
         
-        # Check if there's a manual override for this device
+        # Check if there's a manual override for this device (single query)
         try:
             cursor = db.execute('''
-                SELECT manual_override FROM device_status WHERE device_id = ?
+                SELECT manual_override, total_readings, avg_current, avg_temperature, avg_pressure 
+                FROM device_status WHERE device_id = ?
             ''', (data['device_id'],))
             result = cursor.fetchone()
-            manual_override = result['manual_override'] if result else None
+            
+            if result:
+                manual_override = result['manual_override']
+                existing_total = result['total_readings']
+                existing_avg_current = result['avg_current']
+                existing_avg_temp = result['avg_temperature']
+                existing_avg_pressure = result['avg_pressure']
+            else:
+                manual_override = None
+                existing_total = 0
         except sqlite3.OperationalError:
             # Column doesn't exist yet (old schema), use None
             manual_override = None
+            cursor = db.execute('''
+                SELECT total_readings, avg_current, avg_temperature, avg_pressure 
+                FROM device_status WHERE device_id = ?
+            ''', (data['device_id'],))
+            result = cursor.fetchone()
+            if result:
+                existing_total = result['total_readings']
+                existing_avg_current = result['avg_current']
+                existing_avg_temp = result['avg_temperature']
+                existing_avg_pressure = result['avg_pressure']
+            else:
+                existing_total = 0
         
         # If manual override exists, use it instead of simulator's relay_status
         actual_relay_status = manual_override if manual_override else data['relay_status']
@@ -234,25 +256,20 @@ def insert_sensor_reading(data):
             data['device_type'], data['is_active'], data['maintenance_required']
         ))
         
-        # Update or insert device status, preserving manual_override
-        # Check if device exists
-        cursor = db.execute('SELECT device_id, total_readings, avg_current, avg_temperature, avg_pressure FROM device_status WHERE device_id = ?', 
-                          (data['device_id'],))
-        existing = cursor.fetchone()
-        
-        if existing:
-            # Update existing device
-            total_readings = existing[1] + 1
-            new_avg_current = (existing[2] * existing[1] + data['current']) / total_readings
-            new_avg_temp = (existing[3] * existing[1] + data['temperature']) / total_readings
-            new_avg_pressure = (existing[4] * existing[1] + data['pressure']) / total_readings
+        # Update or insert device status in one operation
+        if existing_total > 0:
+            # Update existing device (optimized calculation)
+            total_readings = existing_total + 1
+            new_avg_current = (existing_avg_current * existing_total + data['current']) / total_readings
+            new_avg_temp = (existing_avg_temp * existing_total + data['temperature']) / total_readings
+            new_avg_pressure = (existing_avg_pressure * existing_total + data['pressure']) / total_readings
             
             try:
                 # Try update with manual_override column
                 db.execute('''
                     UPDATE device_status SET
                         last_seen = ?,
-                        current_status = CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
+                        current_status = 'online',
                         relay_status = COALESCE(manual_override, ?),
                         device_type = ?,
                         is_active = ?,
@@ -263,7 +280,7 @@ def insert_sensor_reading(data):
                         avg_pressure = ?,
                         updated_at = datetime('now')
                     WHERE device_id = ?
-                ''', (data['timestamp'], data['is_active'], actual_relay_status,
+                ''', (data['timestamp'], actual_relay_status,
                       data['device_type'], data['is_active'], data['maintenance_required'],
                       total_readings, new_avg_current, new_avg_temp, new_avg_pressure,
                       data['device_id']))
@@ -272,7 +289,7 @@ def insert_sensor_reading(data):
                 db.execute('''
                     UPDATE device_status SET
                         last_seen = ?,
-                        current_status = CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
+                        current_status = 'online',
                         relay_status = ?,
                         device_type = ?,
                         is_active = ?,
@@ -283,7 +300,7 @@ def insert_sensor_reading(data):
                         avg_pressure = ?,
                         updated_at = datetime('now')
                     WHERE device_id = ?
-                ''', (data['timestamp'], data['is_active'], actual_relay_status,
+                ''', (data['timestamp'], actual_relay_status,
                       data['device_type'], data['is_active'], data['maintenance_required'],
                       total_readings, new_avg_current, new_avg_temp, new_avg_pressure,
                       data['device_id']))
@@ -296,10 +313,8 @@ def insert_sensor_reading(data):
                     (device_id, last_seen, current_status, relay_status, manual_override, device_type, 
                      is_active, maintenance_required, total_readings, avg_current, 
                      avg_temperature, avg_pressure, updated_at)
-                    VALUES (?, ?, 
-                        CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
-                        ?, NULL, ?, ?, ?, 1, ?, ?, ?, datetime('now'))
-                ''', (data['device_id'], data['timestamp'], data['is_active'], actual_relay_status,
+                    VALUES (?, ?, 'online', ?, NULL, ?, ?, ?, 1, ?, ?, ?, datetime('now'))
+                ''', (data['device_id'], data['timestamp'], actual_relay_status,
                       data['device_type'], data['is_active'], data['maintenance_required'],
                       data['current'], data['temperature'], data['pressure']))
             except sqlite3.OperationalError:
@@ -309,10 +324,8 @@ def insert_sensor_reading(data):
                     (device_id, last_seen, current_status, relay_status, device_type, 
                      is_active, maintenance_required, total_readings, avg_current, 
                      avg_temperature, avg_pressure, updated_at)
-                    VALUES (?, ?, 
-                        CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
-                        ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))
-                ''', (data['device_id'], data['timestamp'], data['is_active'], actual_relay_status,
+                    VALUES (?, ?, 'online', ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))
+                ''', (data['device_id'], data['timestamp'], actual_relay_status,
                       data['device_type'], data['is_active'], data['maintenance_required'],
                       data['current'], data['temperature'], data['pressure']))
         
@@ -371,7 +384,7 @@ def get_device_readings(device_id, hours=24, limit=100):
         return []
 
 def get_all_device_status():
-    """Get status of all devices with offline detection and auto-cleanup"""
+    """Get status of all devices with offline detection (lightweight query)"""
     try:
         db = sqlite3.connect('iot_data.db')
         db.row_factory = sqlite3.Row
@@ -379,11 +392,42 @@ def get_all_device_status():
         # Define offline threshold (30 seconds without data = offline)
         offline_threshold = (datetime.now() - timedelta(seconds=30)).isoformat()
         
-        # AUTO-CLEANUP: Delete devices that have been offline for more than 1 minute
-        # This ensures they don't reappear on page refresh
+        # Lightweight query - just filter out old devices
+        # Cleanup happens in a separate scheduled task, not on every read
         one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
         
-        # Delete old sensor readings for offline devices to save space
+        cursor = db.execute('''
+            SELECT *, 
+                CASE 
+                    WHEN last_seen < ? THEN 0
+                    ELSE is_active
+                END as is_active,
+                CASE 
+                    WHEN last_seen < ? THEN 'offline'
+                    ELSE current_status
+                END as current_status
+            FROM device_status 
+            WHERE last_seen >= ?
+            ORDER BY device_id
+        ''', (offline_threshold, offline_threshold, one_minute_ago))
+        
+        devices = [dict(row) for row in cursor.fetchall()]
+        db.close()
+        
+        return devices
+        
+    except Exception as e:
+        logger.error(f"Error getting device status: {e}")
+        return []
+
+def cleanup_offline_devices():
+    """Cleanup devices that have been offline for more than 1 minute (separate function)"""
+    try:
+        db = sqlite3.connect('iot_data.db', timeout=10)
+        
+        one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
+        
+        # Delete old sensor readings for offline devices
         db.execute('''
             DELETE FROM sensor_readings 
             WHERE device_id IN (
@@ -398,27 +442,12 @@ def get_all_device_status():
         ''', (one_minute_ago,))
         
         db.commit()
-        
-        # Now get only the active devices
-        cursor = db.execute('''
-            SELECT *, 
-                CASE 
-                    WHEN last_seen < ? THEN 0
-                    ELSE is_active
-                END as is_active,
-                CASE 
-                    WHEN last_seen < ? THEN 'offline'
-                    ELSE current_status
-                END as current_status
-            FROM device_status 
-            ORDER BY device_id
-        ''', (offline_threshold, offline_threshold))
-        
-        devices = [dict(row) for row in cursor.fetchall()]
+        deleted = db.total_changes
         db.close()
         
-        return devices
+        logger.info(f"Cleaned up {deleted} offline device records")
+        return deleted
         
     except Exception as e:
-        logger.error(f"Error getting device status: {e}")
-        return []
+        logger.error(f"Error cleaning up offline devices: {e}")
+        return 0

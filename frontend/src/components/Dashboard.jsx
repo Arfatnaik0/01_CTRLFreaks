@@ -11,7 +11,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState('all');
-  const [turnedOffDevices, setTurnedOffDevices] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [systemOnline, setSystemOnline] = useState(true);
