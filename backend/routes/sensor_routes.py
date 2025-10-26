@@ -5,14 +5,21 @@ Handles incoming sensor data and device status
 
 from flask import Blueprint, request, jsonify, current_app
 import logging
+from datetime import datetime, timedelta
 from models.database import insert_sensor_reading, get_latest_readings, get_device_readings, get_all_device_status
 
 logger = logging.getLogger(__name__)
 sensor_bp = Blueprint('sensor', __name__)
 
+# Track last email send time to prevent spam
+last_email_check = None
+EMAIL_CHECK_INTERVAL = timedelta(minutes=15)  # Send email at most every 15 minutes
+
 @sensor_bp.route('/sensor-data', methods=['POST'])
 def receive_sensor_data():
     """Receive sensor data from IoT devices"""
+    global last_email_check
+    
     try:
         data = request.get_json()
         
@@ -28,6 +35,28 @@ def receive_sensor_data():
         # Insert into database
         if insert_sensor_reading(data):
             logger.debug(f"Sensor data received from device {data['device_id']}")
+            
+            # Check for critical sensors periodically (not on every request)
+            now = datetime.now()
+            if last_email_check is None or (now - last_email_check) > EMAIL_CHECK_INTERVAL:
+                try:
+                    from services.email_service import email_service
+                    
+                    # Get all devices and check for critical ones
+                    devices = get_all_device_status()
+                    critical_devices = [
+                        d for d in devices 
+                        if d.get('avg_current', 0) > 15 or d.get('avg_temperature', 0) > 30
+                    ]
+                    
+                    if critical_devices:
+                        email_service.send_critical_sensor_alert(critical_devices)
+                        logger.info(f"Critical sensor email sent for {len(critical_devices)} devices")
+                    
+                    last_email_check = now
+                except Exception as email_error:
+                    logger.error(f"Error sending critical sensor email: {email_error}")
+            
             return jsonify({"status": "success", "message": "Data received"}), 200
         else:
             return jsonify({"error": "Failed to store data"}), 500
