@@ -21,7 +21,8 @@ const Dashboard = () => {
     const avgTemp = device.avg_temperature || 0;
     
     // Check if device is turned off (check relay_status from backend)
-    if (device.relay_status === 'OFF') {
+    // Need to check for both 'OFF' and 0 (avg_current = 0 when device is off)
+    if (device.relay_status === 'OFF' || device.relay_status === 'off') {
       return 'turned-off';
     }
     
