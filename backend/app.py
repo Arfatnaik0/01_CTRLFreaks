@@ -66,14 +66,12 @@ from routes.sensor_routes import sensor_bp
 from routes.analytics_routes import analytics_bp
 from routes.control_routes import control_bp
 from routes.auth_routes import auth_bp
-from routes.notification_routes import notification_bp
 
 # Register blueprints
 app.register_blueprint(sensor_bp, url_prefix='/api')
 app.register_blueprint(analytics_bp, url_prefix='/api')
 app.register_blueprint(control_bp, url_prefix='/api')
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
-app.register_blueprint(notification_bp, url_prefix='/api/notifications')
 
 @app.route('/')
 def index():
