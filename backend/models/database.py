@@ -53,6 +53,7 @@ def _create_tables(db):
             last_seen TEXT NOT NULL,
             current_status TEXT NOT NULL,
             relay_status TEXT NOT NULL,
+            manual_override TEXT DEFAULT NULL,
             device_type TEXT NOT NULL,
             is_active BOOLEAN NOT NULL,
             maintenance_required BOOLEAN NOT NULL DEFAULT 0,
@@ -63,6 +64,13 @@ def _create_tables(db):
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Add manual_override column if it doesn't exist (for existing databases)
+    try:
+        db.execute('SELECT manual_override FROM device_status LIMIT 1')
+    except:
+        db.execute('ALTER TABLE device_status ADD COLUMN manual_override TEXT DEFAULT NULL')
+        db.commit()
     
     # Create control_commands table
     db.execute('''
@@ -186,11 +194,22 @@ def init_db():
         raise
 
 def insert_sensor_reading(data):
-    """Insert a new sensor reading"""
+    """Insert a new sensor reading with manual override support"""
     try:
         db = sqlite3.connect('iot_data.db')
+        db.row_factory = sqlite3.Row
         
-        # Insert sensor reading
+        # Check if there's a manual override for this device
+        cursor = db.execute('''
+            SELECT manual_override FROM device_status WHERE device_id = ?
+        ''', (data['device_id'],))
+        result = cursor.fetchone()
+        manual_override = result['manual_override'] if result else None
+        
+        # If manual override exists, use it instead of simulator's relay_status
+        actual_relay_status = manual_override if manual_override else data['relay_status']
+        
+        # Insert sensor reading with actual relay status
         db.execute('''
             INSERT INTO sensor_readings 
             (device_id, timestamp, current, temperature, pressure, relay_status, 
@@ -198,39 +217,37 @@ def insert_sensor_reading(data):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['device_id'], data['timestamp'], data['current'],
-            data['temperature'], data['pressure'], data['relay_status'],
+            data['temperature'], data['pressure'], actual_relay_status,
             data['device_type'], data['is_active'], data['maintenance_required']
         ))
         
-        # Update or insert device status
+        # Update or insert device status, preserving manual_override
         db.execute('''
-            INSERT OR REPLACE INTO device_status
-            (device_id, last_seen, current_status, relay_status, device_type, 
+            INSERT INTO device_status
+            (device_id, last_seen, current_status, relay_status, manual_override, device_type, 
              is_active, maintenance_required, total_readings, avg_current, 
              avg_temperature, avg_pressure, updated_at)
-            SELECT 
-                ?,
-                ?,
+            VALUES (?, ?, 
                 CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
-                ?,
-                ?,
-                ?,
-                ?,
-                COALESCE((SELECT total_readings FROM device_status WHERE device_id = ?), 0) + 1,
-                (COALESCE((SELECT avg_current * total_readings FROM device_status WHERE device_id = ?), 0) + ?) / 
-                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ?), 0) + 1),
-                (COALESCE((SELECT avg_temperature * total_readings FROM device_status WHERE device_id = ?), 0) + ?) / 
-                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ?), 0) + 1),
-                (COALESCE((SELECT avg_pressure * total_readings FROM device_status WHERE device_id = ?), 0) + ?) / 
-                 (COALESCE((SELECT total_readings FROM device_status WHERE device_id = ?), 0) + 1),
-                ?
+                ?, ?, ?, ?, ?,
+                1, ?, ?, ?, datetime('now'))
+            ON CONFLICT(device_id) DO UPDATE SET
+                last_seen = excluded.last_seen,
+                current_status = excluded.current_status,
+                relay_status = COALESCE(device_status.manual_override, excluded.relay_status),
+                device_type = excluded.device_type,
+                is_active = excluded.is_active,
+                maintenance_required = excluded.maintenance_required,
+                total_readings = device_status.total_readings + 1,
+                avg_current = (device_status.avg_current * device_status.total_readings + ?) / (device_status.total_readings + 1),
+                avg_temperature = (device_status.avg_temperature * device_status.total_readings + ?) / (device_status.total_readings + 1),
+                avg_pressure = (device_status.avg_pressure * device_status.total_readings + ?) / (device_status.total_readings + 1),
+                updated_at = datetime('now')
         ''', (
-            data['device_id'], data['timestamp'], data['is_active'], data['relay_status'],
-            data['device_type'], data['is_active'], data['maintenance_required'],
-            data['device_id'], data['device_id'], data['current'], data['device_id'],
-            data['device_id'], data['temperature'], data['device_id'],
-            data['device_id'], data['pressure'], data['device_id'],
-            datetime.now().isoformat()
+            data['device_id'], data['timestamp'], data['is_active'], actual_relay_status,
+            manual_override, data['device_type'], data['is_active'], data['maintenance_required'],
+            data['current'], data['temperature'], data['pressure'],
+            data['current'], data['temperature'], data['pressure']
         ))
         
         db.commit()

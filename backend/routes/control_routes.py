@@ -98,13 +98,35 @@ def control_device(device_id):
 
 @control_bp.route('/device/<device_id>/relay', methods=['PUT'])
 def toggle_relay(device_id):
-    """Toggle device relay (ON/OFF)"""
+    """Toggle device relay (ON/OFF) with persistent state"""
     try:
         data = request.get_json()
-        status = data.get('status', 'ON') if data else 'ON'
+        status = data.get('relay_status') or data.get('status', 'ON')
         
         if status not in ['ON', 'OFF']:
             return jsonify({"error": "Invalid status. Use 'ON' or 'OFF'"}), 400
+        
+        # Save manual override in database
+        db = sqlite3.connect('iot_data.db')
+        
+        # Update or insert manual override
+        db.execute('''
+            UPDATE device_status 
+            SET manual_override = ?, relay_status = ?, updated_at = datetime('now')
+            WHERE device_id = ?
+        ''', (status, status, device_id))
+        
+        # If device doesn't exist yet, create it
+        if db.total_changes == 0:
+            db.execute('''
+                INSERT OR IGNORE INTO device_status 
+                (device_id, last_seen, current_status, relay_status, manual_override, 
+                 device_type, is_active, updated_at)
+                VALUES (?, datetime('now'), 'online', ?, ?, 'unknown', 1, datetime('now'))
+            ''', (device_id, status, status))
+        
+        db.commit()
+        db.close()
         
         command = {
             "device_id": device_id,
@@ -117,11 +139,11 @@ def toggle_relay(device_id):
         global pending_commands
         pending_commands.append(command)
         
-        logger.info(f"Relay command sent to device {device_id}: {status}")
+        logger.info(f"Manual override set for device {device_id}: {status}")
         
         return jsonify({
             "status": "success",
-            "message": f"Device {device_id} relay set to {status}",
+            "message": f"Device {device_id} manually set to {status}",
             "command": command
         }), 200
     
