@@ -13,18 +13,8 @@ def get_db():
     """Get database connection"""
     if not hasattr(g, 'sqlite_db'):
         database_path = current_app.config['DATABASE']
-        if database_path == ':memory:':
-            # For in-memory database, we need to ensure it's initialized
-            if not hasattr(current_app, '_memory_db'):
-                current_app._memory_db = sqlite3.connect(':memory:', check_same_thread=False)
-                current_app._memory_db.row_factory = sqlite3.Row
-                # Initialize tables immediately for in-memory database
-                with current_app.app_context():
-                    _create_tables(current_app._memory_db)
-            g.sqlite_db = current_app._memory_db
-        else:
-            g.sqlite_db = sqlite3.connect(database_path)
-            g.sqlite_db.row_factory = sqlite3.Row
+        g.sqlite_db = sqlite3.connect(database_path)
+        g.sqlite_db.row_factory = sqlite3.Row
     return g.sqlite_db
 
 def _create_tables(db):
@@ -142,7 +132,7 @@ def _create_default_users(db):
             # Create default admin user
             username = 'admin'
             email = 'admin@iot-control.com'
-            password = 'admin'  # Simple default password
+            password = 'admin123'  # Default password
             role = 'admin'
             
             password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
@@ -153,7 +143,7 @@ def _create_default_users(db):
             ''', (username, email, password_hash, role))
             
             db.commit()  # Ensure the user is saved
-            logger.info("Created default admin user - username: admin, password: admin123")
+            logger.info(f"Created default admin user - username: {username}, password: {password}")
     except Exception as e:
         logger.error(f"Error creating default admin user: {e}")
 
@@ -164,25 +154,15 @@ def init_db():
         from flask import current_app
         database_path = current_app.config.get('DATABASE', 'iot_data.db')
         
-        if database_path == ':memory:':
-            # For in-memory database, use the shared connection
-            if hasattr(current_app, '_memory_db'):
-                db = current_app._memory_db
-            else:
-                current_app._memory_db = sqlite3.connect(':memory:', check_same_thread=False)
-                current_app._memory_db.row_factory = sqlite3.Row
-                db = current_app._memory_db
-        else:
-            db = sqlite3.connect(database_path)
-            db.row_factory = sqlite3.Row
+        db = sqlite3.connect(database_path)
+        db.row_factory = sqlite3.Row
         
         _create_tables(db)
         _create_default_users(db)
         
-        if database_path != ':memory:':
-            db.close()
+        db.close()
         
-        logger.info("Database initialized successfully")
+        logger.info(f"Database initialized successfully at {database_path}")
         
     except Exception as e:
         logger.error(f"Error initializing database: {e}")

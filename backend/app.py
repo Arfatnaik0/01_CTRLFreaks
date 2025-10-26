@@ -28,11 +28,8 @@ def create_app():
          allow_headers=["Content-Type", "Authorization"])
     
     # Configuration - use environment variables for production
-    # Use in-memory database for production to avoid file system issues
-    if os.environ.get('FLASK_ENV') == 'production':
-        app.config['DATABASE'] = ':memory:'  # In-memory SQLite database
-    else:
-        app.config['DATABASE'] = os.environ.get('DATABASE_URL', 'iot_data.db')
+    # Use persistent database even in production for data persistence
+    app.config['DATABASE'] = os.environ.get('DATABASE_URL', 'iot_data.db')
     
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(16))
     
