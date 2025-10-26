@@ -9,6 +9,15 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+def _get_db_path():
+    """Get the configured database path"""
+    try:
+        from flask import current_app
+        return current_app.config.get('DATABASE', 'iot_data.db')
+    except:
+        # Fallback if not in app context
+        return 'iot_data.db'
+
 def get_db():
     """Get database connection"""
     if not hasattr(g, 'sqlite_db'):
@@ -188,7 +197,7 @@ def init_db():
 def insert_sensor_reading(data):
     """Insert a new sensor reading"""
     try:
-        db = sqlite3.connect('iot_data.db')
+        db = sqlite3.connect(_get_db_path())
         
         # Insert sensor reading
         db.execute('''
@@ -245,7 +254,7 @@ def insert_sensor_reading(data):
 def get_latest_readings(limit=100):
     """Get latest sensor readings"""
     try:
-        db = sqlite3.connect('iot_data.db')
+        db = sqlite3.connect(_get_db_path())
         db.row_factory = sqlite3.Row
         
         cursor = db.execute('''
@@ -266,7 +275,7 @@ def get_latest_readings(limit=100):
 def get_device_readings(device_id, hours=24, limit=100):
     """Get readings for a specific device"""
     try:
-        db = sqlite3.connect('iot_data.db')
+        db = sqlite3.connect(_get_db_path())
         db.row_factory = sqlite3.Row
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -290,7 +299,7 @@ def get_device_readings(device_id, hours=24, limit=100):
 def get_all_device_status():
     """Get status of all devices with offline detection"""
     try:
-        db = sqlite3.connect('iot_data.db')
+        db = sqlite3.connect(_get_db_path())
         db.row_factory = sqlite3.Row
         
         # Define offline threshold (30 seconds without data = offline)
