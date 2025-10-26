@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import DeviceDetailsModal from './DeviceDetailsModal';
 import ErrorBoundary from './ErrorBoundary';
 
-const DeviceCard = ({ device, onControl, isTurnedOff = false }) => {
+const DeviceCard = ({ device, onControl }) => {
   const [isControlling, setIsControlling] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [notification, setNotification] = useState(null);
@@ -24,8 +24,8 @@ const DeviceCard = ({ device, onControl, isTurnedOff = false }) => {
     const avgCurrent = device.avg_current || 0;
     const avgTemp = device.avg_temperature || 0;
     
-    // Check if device is turned off (either via button or backend)
-    if (isTurnedOff || device.relay_status === 'OFF' || avgCurrent === 0) {
+    // Check if device is turned off (check backend relay_status)
+    if (device.relay_status === 'OFF') {
       return 'gray';
     }
     
@@ -40,7 +40,7 @@ const DeviceCard = ({ device, onControl, isTurnedOff = false }) => {
       // Explicitly turn off the device
       await onControl(device.device_id, 'relay', 'OFF');
       
-      // Show success notification (isTurnedOff state is now managed by parent)
+      // Show success notification
       setNotification({
         type: 'success',
         message: `Device ${device.device_id} has been turned off successfully`
@@ -145,18 +145,16 @@ const DeviceCard = ({ device, onControl, isTurnedOff = false }) => {
           {/* Turn Off Button - Only button for device control */}
           <button
             onClick={handleTurnOff}
-            disabled={isControlling || device.relay_status === 'OFF' || device.avg_current === 0 || isTurnedOff}
+            disabled={isControlling || device.relay_status === 'OFF'}
             className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-              device.relay_status === 'OFF' || device.avg_current === 0 || isTurnedOff
+              device.relay_status === 'OFF'
                 ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 cursor-not-allowed'
                 : 'bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-300'
             } disabled:opacity-50`}
             title={
-              isTurnedOff 
-                ? 'Device has been turned off' 
-                : device.relay_status === 'OFF' || device.avg_current === 0 
-                  ? 'Device is already off' 
-                  : 'Turn off device'
+              device.relay_status === 'OFF'
+                ? 'Device is already off' 
+                : 'Turn off device'
             }
           >
             <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +162,7 @@ const DeviceCard = ({ device, onControl, isTurnedOff = false }) => {
             </svg>
             {isControlling 
               ? 'Turning Off...' 
-              : isTurnedOff 
+              : device.relay_status === 'OFF'
                 ? 'Turned Off' 
                 : 'Turn Off'
             }

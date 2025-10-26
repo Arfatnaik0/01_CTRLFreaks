@@ -21,8 +21,8 @@ const Dashboard = () => {
     const avgCurrent = device.avg_current || 0;
     const avgTemp = device.avg_temperature || 0;
     
-    // Check if device is turned off (manually or by backend)
-    if (turnedOffDevices.has(device.device_id) || device.relay_status === 'OFF' || avgCurrent === 0) {
+    // Check if device is turned off (check relay_status from backend)
+    if (device.relay_status === 'OFF') {
       return 'turned-off';
     }
     
@@ -90,23 +90,12 @@ const Dashboard = () => {
       if (command === 'relay') {
         // Use the dedicated relay toggle API
         await ApiService.toggleRelay(deviceId, value);
-        
-        // Track manually turned off devices
-        if (value === 'OFF') {
-          setTurnedOffDevices(prev => new Set(prev).add(deviceId));
-        } else if (value === 'ON') {
-          setTurnedOffDevices(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(deviceId);
-            return newSet;
-          });
-        }
       } else {
         // Use the generic control API for other commands
         await ApiService.controlDevice(deviceId, command, value);
       }
-      // Refresh data after control action
-      setTimeout(fetchData, 1000);
+      // Refresh data after control action to get updated relay_status from backend
+      setTimeout(fetchData, 500);
     } catch (error) {
       console.error('Control action failed:', error);
       // You might want to show a toast notification here
@@ -418,7 +407,6 @@ const Dashboard = () => {
                 key={device.device_id}
                 device={device}
                 onControl={handleDeviceControl}
-                isTurnedOff={turnedOffDevices.has(device.device_id)}
               />
             ))}
           </div>
