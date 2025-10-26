@@ -137,6 +137,36 @@ def system_status():
             "message": str(e)
         }), 500
 
+@app.route('/api/clear-offline-devices', methods=['POST'])
+def clear_offline_devices():
+    """Manually clear devices that haven't sent data in the last 30 seconds"""
+    try:
+        db = get_db()
+        
+        # Delete devices offline for more than 30 seconds
+        thirty_seconds_ago = (datetime.now() - timedelta(seconds=30)).isoformat()
+        
+        # Delete from device_status
+        cursor = db.execute('''
+            DELETE FROM device_status 
+            WHERE last_seen < ?
+        ''', (thirty_seconds_ago,))
+        
+        deleted_count = cursor.rowcount
+        db.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Cleared {deleted_count} offline devices",
+            "deleted_count": deleted_count
+        })
+    except Exception as e:
+        logger.error(f"Error clearing offline devices: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
 @app.route('/api/init-db')
 def init_database():
     """Initialize database - useful for production deployment"""
