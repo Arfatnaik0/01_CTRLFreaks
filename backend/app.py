@@ -137,44 +137,6 @@ def system_status():
             "message": str(e)
         }), 500
 
-@app.route('/api/debug-devices', methods=['GET'])
-def debug_devices():
-    """Debug endpoint to see all devices and their last_seen times"""
-    try:
-        db = get_db()
-        cursor = db.execute('''
-            SELECT device_id, last_seen, current_status, 
-                   julianday('now') - julianday(last_seen) as days_since_update,
-                   (julianday('now') - julianday(last_seen)) * 24 * 60 as minutes_since_update
-            FROM device_status
-            ORDER BY last_seen DESC
-            LIMIT 10
-        ''')
-        
-        devices = []
-        for row in cursor.fetchall():
-            devices.append({
-                'device_id': row[0],
-                'last_seen': row[1],
-                'current_status': row[2],
-                'minutes_since_update': round(row[4], 2)
-            })
-        
-        now = datetime.now().isoformat()
-        one_min_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
-        
-        return jsonify({
-            "status": "success",
-            "current_time": now,
-            "one_minute_ago_threshold": one_min_ago,
-            "total_devices_in_db": len(devices),
-            "devices": devices,
-            "note": "Devices with minutes_since_update > 1 should be deleted"
-        })
-    except Exception as e:
-        logger.error(f"Error in debug endpoint: {e}")
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/api/clear-offline-devices', methods=['POST'])
 def clear_offline_devices():
     """Manually clear devices that haven't sent data in the last 30 seconds"""
@@ -185,57 +147,36 @@ def clear_offline_devices():
         force = request.args.get('force', 'false').lower() == 'true'
         
         if force:
-            # Count devices before deletion
-            count_cursor = db.execute('SELECT COUNT(*) FROM device_status')
-            before_count = count_cursor.fetchone()[0]
-            
-            logger.info(f"Force clearing ALL {before_count} devices from database")
-            
             # Force delete ALL devices
-            db.execute('DELETE FROM sensor_readings')
-            db.execute('DELETE FROM device_status')
+            cursor = db.execute('DELETE FROM device_status')
+            deleted_count = cursor.rowcount
             db.commit()
-            
-            # Verify deletion
-            count_cursor = db.execute('SELECT COUNT(*) FROM device_status')
-            after_count = count_cursor.fetchone()[0]
-            
-            logger.info(f"After force clear: {after_count} devices remaining")
             
             return jsonify({
                 "status": "success",
-                "message": f"Force cleared ALL devices (was: {before_count}, now: {after_count})",
-                "deleted_count": before_count
+                "message": f"Force cleared ALL {deleted_count} devices",
+                "deleted_count": deleted_count
             })
         else:
             # Delete devices offline for more than 30 seconds
             thirty_seconds_ago = (datetime.now() - timedelta(seconds=30)).isoformat()
             
-            # Count before deletion
-            count_cursor = db.execute('''
-                SELECT COUNT(*) FROM device_status WHERE last_seen < ?
-            ''', (thirty_seconds_ago,))
-            devices_to_delete = count_cursor.fetchone()[0]
-            
-            logger.info(f"Clearing {devices_to_delete} devices offline for >30 seconds (threshold: {thirty_seconds_ago})")
-            
             # Delete from device_status
-            db.execute('''
+            cursor = db.execute('''
                 DELETE FROM device_status 
                 WHERE last_seen < ?
             ''', (thirty_seconds_ago,))
             
+            deleted_count = cursor.rowcount
             db.commit()
-            
-            logger.info(f"Successfully cleared {devices_to_delete} offline devices")
             
             return jsonify({
                 "status": "success",
-                "message": f"Cleared {devices_to_delete} offline devices",
-                "deleted_count": devices_to_delete
+                "message": f"Cleared {deleted_count} offline devices",
+                "deleted_count": deleted_count
             })
     except Exception as e:
-        logger.error(f"Error clearing offline devices: {e}", exc_info=True)
+        logger.error(f"Error clearing offline devices: {e}")
         return jsonify({
             "status": "error",
             "message": str(e)
