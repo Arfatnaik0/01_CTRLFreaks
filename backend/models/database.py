@@ -384,18 +384,37 @@ def get_device_readings(device_id, hours=24, limit=100):
         return []
 
 def get_all_device_status():
-    """Get status of all devices with offline detection (lightweight query)"""
+    """Get status of all devices with offline detection and automatic cleanup"""
     try:
-        db = sqlite3.connect('iot_data.db')
+        db = sqlite3.connect('iot_data.db', timeout=10)
         db.row_factory = sqlite3.Row
         
         # Define offline threshold (30 seconds without data = offline)
         offline_threshold = (datetime.now() - timedelta(seconds=30)).isoformat()
         
-        # Lightweight query - just filter out old devices
-        # Cleanup happens in a separate scheduled task, not on every read
+        # Auto-cleanup: Delete devices that haven't sent data in 1 minute
         one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
         
+        # Delete old sensor readings first
+        db.execute('''
+            DELETE FROM sensor_readings 
+            WHERE device_id IN (
+                SELECT device_id FROM device_status WHERE last_seen < ?
+            )
+        ''', (one_minute_ago,))
+        
+        # Delete old device status records
+        deleted = db.execute('''
+            DELETE FROM device_status 
+            WHERE last_seen < ?
+        ''', (one_minute_ago,))
+        
+        db.commit()
+        
+        if db.total_changes > 0:
+            logger.info(f"Auto-cleaned up {db.total_changes} offline devices")
+        
+        # Now get only active devices
         cursor = db.execute('''
             SELECT *, 
                 CASE 
@@ -407,9 +426,8 @@ def get_all_device_status():
                     ELSE current_status
                 END as current_status
             FROM device_status 
-            WHERE last_seen >= ?
             ORDER BY device_id
-        ''', (offline_threshold, offline_threshold, one_minute_ago))
+        ''', (offline_threshold, offline_threshold))
         
         devices = [dict(row) for row in cursor.fetchall()]
         db.close()
