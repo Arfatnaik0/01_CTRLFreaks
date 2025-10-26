@@ -141,7 +141,9 @@ def system_status():
 def clear_offline_devices():
     """Manually clear devices that haven't sent data in the last 30 seconds"""
     try:
-        db = get_db()
+        import sqlite3
+        db_path = app.config.get('DATABASE', 'iot_data.db')
+        db = sqlite3.connect(db_path)
         
         # Delete devices offline for more than 30 seconds
         thirty_seconds_ago = (datetime.now() - timedelta(seconds=30)).isoformat()
@@ -154,11 +156,13 @@ def clear_offline_devices():
         
         deleted_count = cursor.rowcount
         db.commit()
+        db.close()
         
         return jsonify({
             "status": "success",
             "message": f"Cleared {deleted_count} offline devices",
-            "deleted_count": deleted_count
+            "deleted_count": deleted_count,
+            "threshold": thirty_seconds_ago
         })
     except Exception as e:
         logger.error(f"Error clearing offline devices: {e}")
@@ -171,7 +175,9 @@ def clear_offline_devices():
 def clear_all_devices():
     """Clear ALL device data - use this to reset the system"""
     try:
-        db = get_db()
+        import sqlite3
+        db_path = app.config.get('DATABASE', 'iot_data.db')
+        db = sqlite3.connect(db_path)
         
         # Count before deletion
         count_cursor = db.execute('SELECT COUNT(*) FROM device_status')
@@ -184,6 +190,7 @@ def clear_all_devices():
         db.execute('DELETE FROM device_status')
         db.execute('DELETE FROM sensor_readings')
         db.commit()
+        db.close()
         
         return jsonify({
             "status": "success",
