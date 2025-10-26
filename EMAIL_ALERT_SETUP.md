@@ -6,7 +6,7 @@ The email alert system automatically sends notifications to `arfatnaik800@gmail.
 ## Current Configuration
 ✅ **Already configured and ready to use!**
 
-The system uses **Web3Forms** - a free email service that requires no signup or configuration.
+The system uses **FormSubmit** - a free email service that requires no API key or configuration.
 
 ## How It Works
 
@@ -30,19 +30,31 @@ The email includes:
 
 ## Email Service Options
 
-### Option 1: Web3Forms (Currently Active) ✅
+### Option 1: FormSubmit (Currently Active) ✅
 **Status:** Ready to use, no setup needed!
 
 **Pros:**
-- No signup required
+- No signup or API key required
 - Unlimited emails
 - Works immediately
-- No API key needed
+- Reliable delivery
+- Nice HTML templates
 
 **Cons:**
-- Basic formatting
+- First email requires confirmation (one-time only)
 
-### Option 2: EmailJS (Optional Upgrade)
+### Option 2: Web3Forms (Alternative)
+If you want to switch:
+
+1. Go to https://web3forms.com/
+2. Enter your email to get free access key
+3. Update `frontend/src/services/emailService.js`:
+   ```javascript
+   const WEB3FORMS_KEY = 'your-access-key-here';
+   ```
+4. Change method order to try Web3Forms first
+
+### Option 3: EmailJS (Optional Upgrade)
 If you want better email templates:
 
 1. Go to https://www.emailjs.com/
@@ -66,7 +78,7 @@ If you want better email templates:
 8. Install EmailJS: `cd frontend && npm install @emailjs/browser`
 
 ### Option 3: FormSubmit (Backup)
-Automatically activates if Web3Forms fails.
+Currently active and working!
 
 ## Testing the Email System
 

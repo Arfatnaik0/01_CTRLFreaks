@@ -104,12 +104,13 @@ const Dashboard = () => {
         const result = await emailService.sendCriticalAlert(criticalDevices);
         
         if (result.success && !result.skipped) {
+          const emailType = result.isInitial ? 'Initial alert' : '12-hour update';
           setEmailStatus({
             sent: true,
-            message: `✅ Alert email sent for ${criticalDevices.length} critical device(s)`
+            message: `✅ ${emailType} email sent for ${criticalDevices.length} critical device(s) • Next: ${result.nextEmailIn}`
           });
-          // Clear message after 10 seconds
-          setTimeout(() => setEmailStatus({ sent: false, message: '' }), 10000);
+          // Clear message after 15 seconds
+          setTimeout(() => setEmailStatus({ sent: false, message: '' }), 15000);
         } else if (result.skipped) {
           console.log('Email skipped:', result.reason || 'already sent recently');
         }

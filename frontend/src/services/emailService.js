@@ -13,7 +13,8 @@ const EMAILJS_CONFIG = {
 class EmailService {
   constructor() {
     this.lastEmailSent = null;
-    this.emailCooldown = 5 * 60 * 1000; // 5 minutes between emails
+    this.emailCooldown = 12 * 60 * 60 * 1000; // 12 hours between emails
+    this.initialEmailSent = false; // Track if initial email has been sent
     this.useEmailJS = false; // Set to true after EmailJS setup
   }
 
@@ -21,6 +22,12 @@ class EmailService {
    * Check if enough time has passed since last email
    */
   canSendEmail() {
+    // Always allow initial email
+    if (!this.initialEmailSent) {
+      return true;
+    }
+    
+    // For subsequent emails, check 12-hour cooldown
     if (!this.lastEmailSent) return true;
     return Date.now() - this.lastEmailSent > this.emailCooldown;
   }
@@ -121,11 +128,15 @@ class EmailService {
     }
 
     if (!this.canSendEmail()) {
-      console.log('Email cooldown active. Skipping email.');
+      const timeUntilNext = this.emailCooldown - (Date.now() - this.lastEmailSent);
+      const hoursRemaining = Math.floor(timeUntilNext / (1000 * 60 * 60));
+      const minutesRemaining = Math.floor((timeUntilNext % (1000 * 60 * 60)) / (1000 * 60));
+      console.log(`Email cooldown active. Next email in ${hoursRemaining}h ${minutesRemaining}m`);
       return { success: true, skipped: true, reason: 'cooldown' };
     }
 
-    console.log(`Sending alert for ${criticalDevices.length} critical devices...`);
+    const emailType = !this.initialEmailSent ? 'Initial alert' : 'Periodic update';
+    console.log(`${emailType}: Sending alert for ${criticalDevices.length} critical devices...`);
 
     // Try methods in order of preference (FormSubmit first - no API key needed)
     const methods = [
@@ -137,7 +148,10 @@ class EmailService {
         const result = await method();
         if (result.success) {
           this.lastEmailSent = Date.now();
-          return result;
+          this.initialEmailSent = true;
+          const nextEmail = !this.initialEmailSent ? 'in 12 hours' : 'in 12 hours';
+          console.log(`${emailType} sent successfully! Next email: ${nextEmail}`);
+          return { ...result, isInitial: !this.initialEmailSent, nextEmailIn: '12 hours' };
         }
       } catch (error) {
         console.warn('Email method failed, trying next...', error);
@@ -170,10 +184,13 @@ class EmailService {
   formatEmailBody(devices) {
     const timestamp = new Date().toLocaleString();
     const totalDevices = devices.length;
+    const alertType = !this.initialEmailSent ? '🔔 INITIAL ALERT' : '📊 12-HOUR UPDATE';
     
     return `
+${alertType}
 ⚠️ CRITICAL SENSORS ALERT ⚠️
 
+Report Type: ${!this.initialEmailSent ? 'Initial Alert (Simulator Started)' : '12-Hour Periodic Update'}
 Timestamp: ${timestamp}
 Critical Devices Count: ${totalDevices}
 
@@ -190,6 +207,11 @@ Thresholds:
 
 Please check the dashboard for real-time updates:
 https://iot-frontend-gmny.onrender.com/
+
+---
+Email Schedule:
+• Initial alert sent when simulator starts
+• Periodic updates every 12 hours if critical devices remain
 
 This is an automated alert from the IoT Monitoring System.
 `;
