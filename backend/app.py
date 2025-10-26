@@ -137,6 +137,44 @@ def system_status():
             "message": str(e)
         }), 500
 
+@app.route('/api/debug-devices', methods=['GET'])
+def debug_devices():
+    """Debug endpoint to see all devices and their last_seen times"""
+    try:
+        db = get_db()
+        cursor = db.execute('''
+            SELECT device_id, last_seen, current_status, 
+                   julianday('now') - julianday(last_seen) as days_since_update,
+                   (julianday('now') - julianday(last_seen)) * 24 * 60 as minutes_since_update
+            FROM device_status
+            ORDER BY last_seen DESC
+            LIMIT 10
+        ''')
+        
+        devices = []
+        for row in cursor.fetchall():
+            devices.append({
+                'device_id': row[0],
+                'last_seen': row[1],
+                'current_status': row[2],
+                'minutes_since_update': round(row[4], 2)
+            })
+        
+        now = datetime.now().isoformat()
+        one_min_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
+        
+        return jsonify({
+            "status": "success",
+            "current_time": now,
+            "one_minute_ago_threshold": one_min_ago,
+            "total_devices_in_db": len(devices),
+            "devices": devices,
+            "note": "Devices with minutes_since_update > 1 should be deleted"
+        })
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/clear-offline-devices', methods=['POST'])
 def clear_offline_devices():
     """Manually clear devices that haven't sent data in the last 30 seconds"""
