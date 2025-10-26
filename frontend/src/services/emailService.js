@@ -26,40 +26,12 @@ class EmailService {
   }
 
   /**
-   * Send email using EmailJS
+   * Send email using EmailJS (disabled - requires npm package)
+   * To enable: npm install @emailjs/browser, then set useEmailJS = true
    */
   async sendViaEmailJS(criticalDevices) {
-    if (!this.useEmailJS) {
-      console.log('EmailJS not configured. Email would have been sent with:', {
-        critical_count: criticalDevices.length,
-        devices: criticalDevices.map(d => d.device_id).join(', ')
-      });
-      return { success: true, method: 'disabled' };
-    }
-
-    try {
-      const { default: emailjs } = await import('@emailjs/browser');
-      
-      const templateParams = {
-        to_email: 'arfatnaik800@gmail.com',
-        critical_count: criticalDevices.length,
-        device_list: this.formatDeviceList(criticalDevices),
-        timestamp: new Date().toLocaleString(),
-      };
-
-      const response = await emailjs.send(
-        EMAILJS_CONFIG.serviceId,
-        EMAILJS_CONFIG.templateId,
-        templateParams,
-        EMAILJS_CONFIG.publicKey
-      );
-
-      console.log('Email sent successfully via EmailJS:', response);
-      return { success: true, method: 'emailjs' };
-    } catch (error) {
-      console.error('EmailJS error:', error);
-      throw error;
-    }
+    console.log('EmailJS not configured. Skipping. Install @emailjs/browser to enable.');
+    throw new Error('EmailJS not available');
   }
 
   /**
@@ -144,11 +116,10 @@ class EmailService {
 
     console.log(`Sending alert for ${criticalDevices.length} critical devices...`);
 
-    // Try methods in order of preference
+    // Try methods in order of preference (Web3Forms first - it's configured and working)
     const methods = [
       () => this.sendViaWeb3Forms(criticalDevices),
       () => this.sendViaFormSubmit(criticalDevices),
-      () => this.sendViaEmailJS(criticalDevices),
     ];
 
     for (const method of methods) {
