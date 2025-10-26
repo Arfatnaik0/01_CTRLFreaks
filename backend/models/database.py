@@ -305,6 +305,14 @@ def get_all_device_status():
         # Define offline threshold (30 seconds without data = offline)
         offline_threshold = (datetime.now() - timedelta(seconds=30)).isoformat()
         
+        # Auto-cleanup: Delete devices that haven't sent data in 10 seconds
+        ten_seconds_ago = (datetime.now() - timedelta(seconds=10)).isoformat()
+        db.execute('''
+            DELETE FROM device_status 
+            WHERE last_seen < ?
+        ''', (ten_seconds_ago,))
+        db.commit()
+        
         cursor = db.execute('''
             SELECT *, 
                 CASE 
@@ -322,12 +330,7 @@ def get_all_device_status():
         devices = [dict(row) for row in cursor.fetchall()]
         db.close()
         
-        # Filter out devices that have been offline for more than 10 seconds
-        # This will make them disappear from the dashboard
-        ten_seconds_ago = (datetime.now() - timedelta(seconds=10)).isoformat()
-        active_devices = [d for d in devices if d['last_seen'] > ten_seconds_ago]
-        
-        return active_devices
+        return devices
         
     except Exception as e:
         logger.error(f"Error getting device status: {e}")
