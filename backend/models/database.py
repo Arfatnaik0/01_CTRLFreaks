@@ -12,7 +12,16 @@ logger = logging.getLogger(__name__)
 def get_db():
     """Get database connection"""
     if not hasattr(g, 'sqlite_db'):
+        import os
+        
         database_path = current_app.config['DATABASE']
+        
+        # Create directory if it doesn't exist
+        db_dir = os.path.dirname(database_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            logger.info(f"Created database directory: {db_dir}")
+        
         g.sqlite_db = sqlite3.connect(database_path)
         g.sqlite_db.row_factory = sqlite3.Row
     return g.sqlite_db
@@ -152,7 +161,15 @@ def init_db():
     try:
         # Use the configured database path from Flask config
         from flask import current_app
+        import os
+        
         database_path = current_app.config.get('DATABASE', 'iot_data.db')
+        
+        # Create directory if it doesn't exist (for production with persistent disk)
+        db_dir = os.path.dirname(database_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            logger.info(f"Created database directory: {db_dir}")
         
         db = sqlite3.connect(database_path)
         db.row_factory = sqlite3.Row
