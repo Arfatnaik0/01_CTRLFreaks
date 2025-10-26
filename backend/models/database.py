@@ -306,21 +306,22 @@ def get_all_device_status():
         offline_threshold = (datetime.now() - timedelta(seconds=30)).isoformat()
         
         # Auto-cleanup: Delete devices that haven't sent data in 10 seconds
+        # Use datetime() function for proper comparison in SQLite
         ten_seconds_ago = (datetime.now() - timedelta(seconds=10)).isoformat()
         db.execute('''
             DELETE FROM device_status 
-            WHERE last_seen < ?
+            WHERE datetime(last_seen) < datetime(?)
         ''', (ten_seconds_ago,))
         db.commit()
         
         cursor = db.execute('''
             SELECT *, 
                 CASE 
-                    WHEN last_seen < ? THEN 0
+                    WHEN datetime(last_seen) < datetime(?) THEN 0
                     ELSE is_active
                 END as is_active,
                 CASE 
-                    WHEN last_seen < ? THEN 'offline'
+                    WHEN datetime(last_seen) < datetime(?) THEN 'offline'
                     ELSE current_status
                 END as current_status
             FROM device_status 
