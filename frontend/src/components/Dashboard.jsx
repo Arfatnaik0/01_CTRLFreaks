@@ -3,6 +3,7 @@ import DeviceCard from './DeviceCard';
 import StatsCard from './StatsCard';
 import ChartCard from './ChartCard';
 import { ApiService } from '../services/api';
+import { emailService } from '../services/emailService';
 
 const Dashboard = () => {
   const [devices, setDevices] = useState([]);
@@ -14,6 +15,7 @@ const Dashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [systemOnline, setSystemOnline] = useState(true);
+  const [emailStatus, setEmailStatus] = useState({ sent: false, message: '' });
 
   // Helper function to get device status (same logic as DeviceCard)
   const getDeviceStatus = (device) => {
@@ -67,16 +69,58 @@ const Dashboard = () => {
         ApiService.getSystemStatus()
       ]);
 
-      setDevices(devicesResponse.devices || []);
+      const fetchedDevices = devicesResponse.devices || [];
+      setDevices(fetchedDevices);
       setAnalytics(analyticsResponse.analytics || null);
       setLatestReadings(readingsResponse.readings || []);
       setSystemOnline(systemStatusResponse.system_online || false);
       setLastUpdate(new Date());
+
+      // Check for critical devices and send email alert
+      checkAndSendCriticalAlert(fetchedDevices);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       setSystemOnline(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Check for critical devices and send email if needed
+  const checkAndSendCriticalAlert = async (devicesList) => {
+    try {
+      // Filter critical devices (excluding turned-off devices)
+      const criticalDevices = devicesList.filter(device => {
+        if (device.relay_status === 'OFF' || device.relay_status === 'off') {
+          return false; // Skip turned-off devices
+        }
+        const avgCurrent = device.avg_current || 0;
+        const avgTemp = device.avg_temperature || 0;
+        return avgCurrent > 20 || avgTemp > 35 || device.maintenance_required;
+      });
+
+      if (criticalDevices.length > 0) {
+        console.log(`Found ${criticalDevices.length} critical devices`);
+        const result = await emailService.sendCriticalAlert(criticalDevices);
+        
+        if (result.success && !result.skipped) {
+          setEmailStatus({
+            sent: true,
+            message: `✅ Alert email sent for ${criticalDevices.length} critical device(s)`
+          });
+          // Clear message after 10 seconds
+          setTimeout(() => setEmailStatus({ sent: false, message: '' }), 10000);
+        } else if (result.skipped) {
+          console.log('Email skipped:', result.reason || 'already sent recently');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send email alert:', error);
+      setEmailStatus({
+        sent: false,
+        message: '⚠️ Failed to send email alert'
+      });
+      setTimeout(() => setEmailStatus({ sent: false, message: '' }), 5000);
     }
   };
 
@@ -133,6 +177,16 @@ const Dashboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Email Status Indicator */}
+          {emailStatus.message && (
+            <div className={`text-sm px-3 py-2 rounded-lg ${
+              emailStatus.sent 
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300' 
+                : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+            }`}>
+              {emailStatus.message}
+            </div>
+          )}
           <div className="text-sm text-slate-500 dark:text-slate-400">
             Last updated: {lastUpdate.toLocaleTimeString()}
           </div>
