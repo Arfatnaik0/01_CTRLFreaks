@@ -71,28 +71,39 @@ class EmailService {
   }
 
   /**
-   * Send email using FormSubmit (another backup)
+   * Send email using FormSubmit (no API key needed!)
+   * Free, unlimited emails with no signup required
    */
   async sendViaFormSubmit(criticalDevices) {
     try {
-      const form = new FormData();
-      form.append('_to', 'arfatnaik800@gmail.com');
-      form.append('_subject', `⚠️ Critical IoT Sensors Alert - ${criticalDevices.length} Devices`);
-      form.append('_template', 'box');
-      form.append('_captcha', 'false');
-      form.append('message', this.formatEmailBody(criticalDevices));
-
+      const emailBody = this.formatEmailBody(criticalDevices);
+      
       const response = await fetch('https://formsubmit.co/ajax/arfatnaik800@gmail.com', {
         method: 'POST',
-        body: form,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          _subject: `⚠️ Critical IoT Sensors Alert - ${criticalDevices.length} Devices Need Attention`,
+          _template: 'box',
+          _captcha: 'false',
+          message: emailBody,
+          critical_count: criticalDevices.length,
+          timestamp: new Date().toLocaleString()
+        }),
       });
 
+      if (!response.ok) {
+        throw new Error(`FormSubmit returned ${response.status}`);
+      }
+
       const result = await response.json();
-      if (result.success) {
+      if (result.success === 'true' || result.success === true) {
         console.log('Email sent successfully via FormSubmit');
         return { success: true, method: 'formsubmit' };
       } else {
-        throw new Error('FormSubmit failed');
+        throw new Error('FormSubmit failed: ' + JSON.stringify(result));
       }
     } catch (error) {
       console.error('FormSubmit error:', error);
@@ -116,9 +127,8 @@ class EmailService {
 
     console.log(`Sending alert for ${criticalDevices.length} critical devices...`);
 
-    // Try methods in order of preference (Web3Forms first - it's configured and working)
+    // Try methods in order of preference (FormSubmit first - no API key needed)
     const methods = [
-      () => this.sendViaWeb3Forms(criticalDevices),
       () => this.sendViaFormSubmit(criticalDevices),
     ];
 
