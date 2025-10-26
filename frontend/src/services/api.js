@@ -27,6 +27,10 @@ export class ApiService {
     return this.request('/health');
   }
 
+  static async getSystemStatus() {
+    return this.request('/system-status');
+  }
+
   static async getDeviceStatus() {
     return this.request('/devices/status');
   }

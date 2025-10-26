@@ -14,6 +14,7 @@ const Dashboard = () => {
   const [turnedOffDevices, setTurnedOffDevices] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [systemOnline, setSystemOnline] = useState(true);
 
   // Helper function to get device status (same logic as DeviceCard)
   const getDeviceStatus = (device) => {
@@ -59,18 +60,21 @@ const Dashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [devicesResponse, analyticsResponse, readingsResponse] = await Promise.all([
+      const [devicesResponse, analyticsResponse, readingsResponse, systemStatusResponse] = await Promise.all([
         ApiService.getDeviceStatus(),
         ApiService.getAnalyticsOverview(),
-        ApiService.getLatestReadings()
+        ApiService.getLatestReadings(),
+        ApiService.getSystemStatus()
       ]);
 
       setDevices(devicesResponse.devices || []);
       setAnalytics(analyticsResponse.analytics || null);
       setLatestReadings(readingsResponse.readings || []);
+      setSystemOnline(systemStatusResponse.system_online || false);
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Failed to fetch data:', error);
+      setSystemOnline(false);
     } finally {
       setLoading(false);
     }

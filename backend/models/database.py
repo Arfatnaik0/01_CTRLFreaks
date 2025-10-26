@@ -288,20 +288,37 @@ def get_device_readings(device_id, hours=24, limit=100):
         return []
 
 def get_all_device_status():
-    """Get status of all devices"""
+    """Get status of all devices with offline detection"""
     try:
         db = sqlite3.connect('iot_data.db')
         db.row_factory = sqlite3.Row
         
+        # Define offline threshold (30 seconds without data = offline)
+        offline_threshold = (datetime.now() - timedelta(seconds=30)).isoformat()
+        
         cursor = db.execute('''
-            SELECT * FROM device_status 
+            SELECT *, 
+                CASE 
+                    WHEN last_seen < ? THEN 0
+                    ELSE is_active
+                END as is_active,
+                CASE 
+                    WHEN last_seen < ? THEN 'offline'
+                    ELSE current_status
+                END as current_status
+            FROM device_status 
             ORDER BY device_id
-        ''')
+        ''', (offline_threshold, offline_threshold))
         
         devices = [dict(row) for row in cursor.fetchall()]
         db.close()
         
-        return devices
+        # Filter out devices that have been offline for more than 5 minutes
+        # This will make them disappear from the dashboard
+        five_minutes_ago = (datetime.now() - timedelta(minutes=5)).isoformat()
+        active_devices = [d for d in devices if d['last_seen'] > five_minutes_ago]
+        
+        return active_devices
         
     except Exception as e:
         logger.error(f"Error getting device status: {e}")

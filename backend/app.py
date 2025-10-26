@@ -107,6 +107,36 @@ def health():
         "timestamp": datetime.now().isoformat()
     })
 
+@app.route('/api/system-status')
+def system_status():
+    """Get overall system status including device connectivity"""
+    try:
+        from models.database import get_all_device_status
+        
+        devices = get_all_device_status()
+        
+        # Check if any devices are online (received data in last 30 seconds)
+        thirty_seconds_ago = (datetime.now() - timedelta(seconds=30)).isoformat()
+        online_devices = [d for d in devices if d.get('last_seen', '') > thirty_seconds_ago]
+        
+        system_online = len(online_devices) > 0
+        
+        return jsonify({
+            "status": "success",
+            "system_online": system_online,
+            "total_devices": len(devices),
+            "online_devices": len(online_devices),
+            "offline_devices": len(devices) - len(online_devices),
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error getting system status: {e}")
+        return jsonify({
+            "status": "error",
+            "system_online": False,
+            "message": str(e)
+        }), 500
+
 @app.route('/api/init-db')
 def init_database():
     """Initialize database - useful for production deployment"""

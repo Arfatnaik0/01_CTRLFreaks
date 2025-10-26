@@ -5,38 +5,38 @@ import { AuthContext } from '../contexts/AuthContext';
 const Header = () => {
   const [connectionStatus, setConnectionStatus] = useState('checking');
   const [systemHealth, setSystemHealth] = useState(null);
+  const [systemOnline, setSystemOnline] = useState(false);
   const { user, logout } = useContext(AuthContext);
 
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const health = await ApiService.getHealth();
+        const [health, systemStatus] = await Promise.all([
+          ApiService.getHealth(),
+          ApiService.getSystemStatus()
+        ]);
         setSystemHealth(health);
+        setSystemOnline(systemStatus.system_online);
         setConnectionStatus('connected');
       } catch (error) {
         setConnectionStatus('disconnected');
+        setSystemOnline(false);
       }
     };
 
     checkStatus();
-    const interval = setInterval(checkStatus, 10000);
+    const interval = setInterval(checkStatus, 5000); // Check every 5 seconds
     return () => clearInterval(interval);
   }, []);
 
   const getStatusColor = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'bg-green-500';
-      case 'disconnected': return 'bg-red-500';
-      default: return 'bg-yellow-500';
-    }
+    if (connectionStatus !== 'connected') return 'bg-red-500';
+    return systemOnline ? 'bg-green-500' : 'bg-gray-500';
   };
 
   const getStatusText = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'System Online';
-      case 'disconnected': return 'System Offline';
-      default: return 'Checking...';
-    }
+    if (connectionStatus !== 'connected') return 'System Offline';
+    return systemOnline ? 'System Online' : 'System Offline';
   };
 
   const handleLogout = async () => {
