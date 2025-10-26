@@ -65,12 +65,21 @@ def _create_tables(db):
         )
     ''')
     
-    # Add manual_override column if it doesn't exist (for existing databases)
-    try:
-        db.execute('SELECT manual_override FROM device_status LIMIT 1')
-    except:
-        db.execute('ALTER TABLE device_status ADD COLUMN manual_override TEXT DEFAULT NULL')
-        db.commit()
+    # Ensure manual_override column exists (for database migration)
+    # Check if column exists by querying sqlite_master
+    cursor = db.execute('''
+        SELECT COUNT(*) as count FROM pragma_table_info('device_status') 
+        WHERE name='manual_override'
+    ''')
+    column_exists = cursor.fetchone()[0] > 0
+    
+    if not column_exists:
+        try:
+            db.execute('ALTER TABLE device_status ADD COLUMN manual_override TEXT DEFAULT NULL')
+            db.commit()
+            logger.info("Added manual_override column to device_status table")
+        except Exception as e:
+            logger.warning(f"Could not add manual_override column (may already exist): {e}")
     
     # Create control_commands table
     db.execute('''
@@ -200,11 +209,15 @@ def insert_sensor_reading(data):
         db.row_factory = sqlite3.Row
         
         # Check if there's a manual override for this device
-        cursor = db.execute('''
-            SELECT manual_override FROM device_status WHERE device_id = ?
-        ''', (data['device_id'],))
-        result = cursor.fetchone()
-        manual_override = result['manual_override'] if result else None
+        try:
+            cursor = db.execute('''
+                SELECT manual_override FROM device_status WHERE device_id = ?
+            ''', (data['device_id'],))
+            result = cursor.fetchone()
+            manual_override = result['manual_override'] if result else None
+        except sqlite3.OperationalError:
+            # Column doesn't exist yet (old schema), use None
+            manual_override = None
         
         # If manual override exists, use it instead of simulator's relay_status
         actual_relay_status = manual_override if manual_override else data['relay_status']
@@ -222,33 +235,86 @@ def insert_sensor_reading(data):
         ))
         
         # Update or insert device status, preserving manual_override
-        db.execute('''
-            INSERT INTO device_status
-            (device_id, last_seen, current_status, relay_status, manual_override, device_type, 
-             is_active, maintenance_required, total_readings, avg_current, 
-             avg_temperature, avg_pressure, updated_at)
-            VALUES (?, ?, 
-                CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
-                ?, ?, ?, ?, ?,
-                1, ?, ?, ?, datetime('now'))
-            ON CONFLICT(device_id) DO UPDATE SET
-                last_seen = excluded.last_seen,
-                current_status = excluded.current_status,
-                relay_status = COALESCE(device_status.manual_override, excluded.relay_status),
-                device_type = excluded.device_type,
-                is_active = excluded.is_active,
-                maintenance_required = excluded.maintenance_required,
-                total_readings = device_status.total_readings + 1,
-                avg_current = (device_status.avg_current * device_status.total_readings + ?) / (device_status.total_readings + 1),
-                avg_temperature = (device_status.avg_temperature * device_status.total_readings + ?) / (device_status.total_readings + 1),
-                avg_pressure = (device_status.avg_pressure * device_status.total_readings + ?) / (device_status.total_readings + 1),
-                updated_at = datetime('now')
-        ''', (
-            data['device_id'], data['timestamp'], data['is_active'], actual_relay_status,
-            manual_override, data['device_type'], data['is_active'], data['maintenance_required'],
-            data['current'], data['temperature'], data['pressure'],
-            data['current'], data['temperature'], data['pressure']
-        ))
+        # Check if device exists
+        cursor = db.execute('SELECT device_id, total_readings, avg_current, avg_temperature, avg_pressure FROM device_status WHERE device_id = ?', 
+                          (data['device_id'],))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing device
+            total_readings = existing[1] + 1
+            new_avg_current = (existing[2] * existing[1] + data['current']) / total_readings
+            new_avg_temp = (existing[3] * existing[1] + data['temperature']) / total_readings
+            new_avg_pressure = (existing[4] * existing[1] + data['pressure']) / total_readings
+            
+            try:
+                # Try update with manual_override column
+                db.execute('''
+                    UPDATE device_status SET
+                        last_seen = ?,
+                        current_status = CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
+                        relay_status = COALESCE(manual_override, ?),
+                        device_type = ?,
+                        is_active = ?,
+                        maintenance_required = ?,
+                        total_readings = ?,
+                        avg_current = ?,
+                        avg_temperature = ?,
+                        avg_pressure = ?,
+                        updated_at = datetime('now')
+                    WHERE device_id = ?
+                ''', (data['timestamp'], data['is_active'], actual_relay_status,
+                      data['device_type'], data['is_active'], data['maintenance_required'],
+                      total_readings, new_avg_current, new_avg_temp, new_avg_pressure,
+                      data['device_id']))
+            except sqlite3.OperationalError:
+                # Fallback without manual_override column
+                db.execute('''
+                    UPDATE device_status SET
+                        last_seen = ?,
+                        current_status = CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
+                        relay_status = ?,
+                        device_type = ?,
+                        is_active = ?,
+                        maintenance_required = ?,
+                        total_readings = ?,
+                        avg_current = ?,
+                        avg_temperature = ?,
+                        avg_pressure = ?,
+                        updated_at = datetime('now')
+                    WHERE device_id = ?
+                ''', (data['timestamp'], data['is_active'], actual_relay_status,
+                      data['device_type'], data['is_active'], data['maintenance_required'],
+                      total_readings, new_avg_current, new_avg_temp, new_avg_pressure,
+                      data['device_id']))
+        else:
+            # Insert new device
+            try:
+                # Try insert with manual_override column
+                db.execute('''
+                    INSERT INTO device_status
+                    (device_id, last_seen, current_status, relay_status, manual_override, device_type, 
+                     is_active, maintenance_required, total_readings, avg_current, 
+                     avg_temperature, avg_pressure, updated_at)
+                    VALUES (?, ?, 
+                        CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
+                        ?, NULL, ?, ?, ?, 1, ?, ?, ?, datetime('now'))
+                ''', (data['device_id'], data['timestamp'], data['is_active'], actual_relay_status,
+                      data['device_type'], data['is_active'], data['maintenance_required'],
+                      data['current'], data['temperature'], data['pressure']))
+            except sqlite3.OperationalError:
+                # Fallback without manual_override column
+                db.execute('''
+                    INSERT INTO device_status
+                    (device_id, last_seen, current_status, relay_status, device_type, 
+                     is_active, maintenance_required, total_readings, avg_current, 
+                     avg_temperature, avg_pressure, updated_at)
+                    VALUES (?, ?, 
+                        CASE WHEN ? = 1 THEN 'online' ELSE 'offline' END,
+                        ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))
+                ''', (data['device_id'], data['timestamp'], data['is_active'], actual_relay_status,
+                      data['device_type'], data['is_active'], data['maintenance_required'],
+                      data['current'], data['temperature'], data['pressure']))
         
         db.commit()
         db.close()
