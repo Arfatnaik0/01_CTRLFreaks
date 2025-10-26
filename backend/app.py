@@ -141,9 +141,7 @@ def system_status():
 def clear_offline_devices():
     """Manually clear devices that haven't sent data in the last 30 seconds"""
     try:
-        import sqlite3
-        db_path = app.config.get('DATABASE', 'iot_data.db')
-        db = sqlite3.connect(db_path)
+        db = get_db()
         
         # Delete devices offline for more than 30 seconds
         thirty_seconds_ago = (datetime.now() - timedelta(seconds=30)).isoformat()
@@ -156,50 +154,14 @@ def clear_offline_devices():
         
         deleted_count = cursor.rowcount
         db.commit()
-        db.close()
         
         return jsonify({
             "status": "success",
             "message": f"Cleared {deleted_count} offline devices",
-            "deleted_count": deleted_count,
-            "threshold": thirty_seconds_ago
+            "deleted_count": deleted_count
         })
     except Exception as e:
         logger.error(f"Error clearing offline devices: {e}")
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-
-@app.route('/api/clear-all-devices', methods=['POST'])
-def clear_all_devices():
-    """Clear ALL device data - use this to reset the system"""
-    try:
-        import sqlite3
-        db_path = app.config.get('DATABASE', 'iot_data.db')
-        db = sqlite3.connect(db_path)
-        
-        # Count before deletion
-        count_cursor = db.execute('SELECT COUNT(*) FROM device_status')
-        device_count = count_cursor.fetchone()[0]
-        
-        readings_cursor = db.execute('SELECT COUNT(*) FROM sensor_readings')
-        readings_count = readings_cursor.fetchone()[0]
-        
-        # Delete all devices and readings
-        db.execute('DELETE FROM device_status')
-        db.execute('DELETE FROM sensor_readings')
-        db.commit()
-        db.close()
-        
-        return jsonify({
-            "status": "success",
-            "message": "All device data cleared",
-            "devices_deleted": device_count,
-            "readings_deleted": readings_count
-        })
-    except Exception as e:
-        logger.error(f"Error clearing all devices: {e}")
         return jsonify({
             "status": "error",
             "message": str(e)

@@ -9,15 +9,6 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-def _get_db_path():
-    """Get the configured database path"""
-    try:
-        from flask import current_app
-        return current_app.config.get('DATABASE', 'iot_data.db')
-    except:
-        # Fallback if not in app context
-        return 'iot_data.db'
-
 def get_db():
     """Get database connection"""
     if not hasattr(g, 'sqlite_db'):
@@ -197,7 +188,7 @@ def init_db():
 def insert_sensor_reading(data):
     """Insert a new sensor reading"""
     try:
-        db = sqlite3.connect(_get_db_path())
+        db = sqlite3.connect('iot_data.db')
         
         # Insert sensor reading
         db.execute('''
@@ -254,7 +245,7 @@ def insert_sensor_reading(data):
 def get_latest_readings(limit=100):
     """Get latest sensor readings"""
     try:
-        db = sqlite3.connect(_get_db_path())
+        db = sqlite3.connect('iot_data.db')
         db.row_factory = sqlite3.Row
         
         cursor = db.execute('''
@@ -275,7 +266,7 @@ def get_latest_readings(limit=100):
 def get_device_readings(device_id, hours=24, limit=100):
     """Get readings for a specific device"""
     try:
-        db = sqlite3.connect(_get_db_path())
+        db = sqlite3.connect('iot_data.db')
         db.row_factory = sqlite3.Row
         
         since = (datetime.now() - timedelta(hours=hours)).isoformat()
@@ -299,29 +290,20 @@ def get_device_readings(device_id, hours=24, limit=100):
 def get_all_device_status():
     """Get status of all devices with offline detection"""
     try:
-        db = sqlite3.connect(_get_db_path())
+        db = sqlite3.connect('iot_data.db')
         db.row_factory = sqlite3.Row
         
         # Define offline threshold (30 seconds without data = offline)
         offline_threshold = (datetime.now() - timedelta(seconds=30)).isoformat()
         
-        # Auto-cleanup: Delete devices that haven't sent data in 10 seconds
-        # Use datetime() function for proper comparison in SQLite
-        ten_seconds_ago = (datetime.now() - timedelta(seconds=10)).isoformat()
-        db.execute('''
-            DELETE FROM device_status 
-            WHERE datetime(last_seen) < datetime(?)
-        ''', (ten_seconds_ago,))
-        db.commit()
-        
         cursor = db.execute('''
             SELECT *, 
                 CASE 
-                    WHEN datetime(last_seen) < datetime(?) THEN 0
+                    WHEN last_seen < ? THEN 0
                     ELSE is_active
                 END as is_active,
                 CASE 
-                    WHEN datetime(last_seen) < datetime(?) THEN 'offline'
+                    WHEN last_seen < ? THEN 'offline'
                     ELSE current_status
                 END as current_status
             FROM device_status 
@@ -331,7 +313,12 @@ def get_all_device_status():
         devices = [dict(row) for row in cursor.fetchall()]
         db.close()
         
-        return devices
+        # Filter out devices that have been offline for more than 1 minute
+        # This will make them disappear from the dashboard
+        one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
+        active_devices = [d for d in devices if d['last_seen'] > one_minute_ago]
+        
+        return active_devices
         
     except Exception as e:
         logger.error(f"Error getting device status: {e}")
