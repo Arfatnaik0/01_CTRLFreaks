@@ -173,7 +173,7 @@ class EmailService {
    - Current: ${d.avg_current?.toFixed(2)}A ${d.avg_current > 20 ? '🔴 CRITICAL' : '⚠️'}
    - Temperature: ${d.avg_temperature?.toFixed(2)}°C ${d.avg_temperature > 35 ? '🔴 CRITICAL' : '⚠️'}
    - Status: ${d.current_status}
-   - Maintenance Required: 'YES ⚠️'`
+   - Maintenance Required: YES ⚠️`
       )
       .join('\n\n');
   }
