@@ -138,7 +138,7 @@ class DeviceFleet:
             response = requests.post(
                 f"{self.backend_url}/api/sensor-data",
                 json=readings,
-                timeout=5
+                timeout=15  # Increased timeout from 5 to 15 seconds
             )
             
             if response.status_code == 200:
@@ -146,6 +146,8 @@ class DeviceFleet:
             else:
                 logger.warning(f"Failed to send data for device {device.device_id}: {response.status_code}")
                 
+        except requests.exceptions.Timeout:
+            logger.warning(f"Timeout sending data for device {device.device_id} - server may be busy")
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error sending data for device {device.device_id}: {e}")
         except Exception as e:
@@ -153,18 +155,22 @@ class DeviceFleet:
     
     def device_worker(self, device: IoTDevice):
         """Worker thread for individual device"""
+        # Initial stagger: spread device starts over the first interval to avoid thundering herd
+        initial_delay = random.uniform(0, self.send_interval)
+        time.sleep(initial_delay)
+        
         while self.running:
             if device.is_active:
                 self.send_sensor_data(device)
             
-            # Add some jitter to prevent thundering herd
-            sleep_time = self.send_interval + random.uniform(-1, 1)
-            time.sleep(max(1, sleep_time))
+            # Add significant jitter to prevent thundering herd
+            sleep_time = self.send_interval + random.uniform(-2, 2)
+            time.sleep(max(2, sleep_time))
     
     def check_control_commands(self):
         """Check for control commands from backend"""
         try:
-            response = requests.get(f"{self.backend_url}/api/control-commands", timeout=5)
+            response = requests.get(f"{self.backend_url}/api/control-commands", timeout=15)
             if response.status_code == 200:
                 commands = response.json()
                 for command in commands.get('commands', []):
