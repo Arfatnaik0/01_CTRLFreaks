@@ -288,7 +288,7 @@ def get_device_readings(device_id, hours=24, limit=100):
         return []
 
 def get_all_device_status():
-    """Get status of all devices with offline detection"""
+    """Get status of all devices with offline detection and auto-cleanup"""
     try:
         db = sqlite3.connect('iot_data.db')
         db.row_factory = sqlite3.Row
@@ -296,6 +296,27 @@ def get_all_device_status():
         # Define offline threshold (30 seconds without data = offline)
         offline_threshold = (datetime.now() - timedelta(seconds=30)).isoformat()
         
+        # AUTO-CLEANUP: Delete devices that have been offline for more than 1 minute
+        # This ensures they don't reappear on page refresh
+        one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
+        
+        # Delete old sensor readings for offline devices to save space
+        db.execute('''
+            DELETE FROM sensor_readings 
+            WHERE device_id IN (
+                SELECT device_id FROM device_status WHERE last_seen < ?
+            )
+        ''', (one_minute_ago,))
+        
+        # Delete old device status records
+        db.execute('''
+            DELETE FROM device_status 
+            WHERE last_seen < ?
+        ''', (one_minute_ago,))
+        
+        db.commit()
+        
+        # Now get only the active devices
         cursor = db.execute('''
             SELECT *, 
                 CASE 
@@ -313,12 +334,7 @@ def get_all_device_status():
         devices = [dict(row) for row in cursor.fetchall()]
         db.close()
         
-        # Filter out devices that have been offline for more than 1 minute
-        # This will make them disappear from the dashboard
-        one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
-        active_devices = [d for d in devices if d['last_seen'] > one_minute_ago]
-        
-        return active_devices
+        return devices
         
     except Exception as e:
         logger.error(f"Error getting device status: {e}")
