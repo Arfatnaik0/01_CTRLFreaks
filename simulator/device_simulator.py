@@ -27,18 +27,18 @@ class IoTDevice:
         self.is_active = True
         self.relay_status = "ON"
         
-        # Device characteristics - vary by type (optimized for mostly optimal readings)
-        self.base_current = random.uniform(5.0, 12.0)  # Amps (reduced from 25.0 to stay below warning threshold of 15A)
-        self.base_temperature = random.uniform(20.0, 26.0)  # Celsius (reduced from 35.0 to stay below warning threshold of 30°C)
-        self.base_pressure = random.uniform(1.0, 4.0)  # bar (slightly reduced)
+        # Device characteristics - vary by type (heavily optimized for mostly optimal readings)
+        self.base_current = random.uniform(6.0, 10.0)  # Amps (safe zone, well below 15A warning threshold)
+        self.base_temperature = random.uniform(22.0, 26.0)  # Celsius (safe zone, well below 30°C warning threshold)
+        self.base_pressure = random.uniform(1.5, 3.5)  # bar (moderate range)
         
-        # Operational parameters (reduced drift for more stability)
-        self.current_drift = random.uniform(-0.2, 0.2)  # Reduced from ±0.5
-        self.temp_drift = random.uniform(-0.1, 0.1)  # Reduced from ±0.2
-        self.pressure_drift = random.uniform(-0.05, 0.05)  # Reduced from ±0.1
+        # Operational parameters (minimal drift for stability)
+        self.current_drift = random.uniform(-0.05, 0.05)  # Minimal drift
+        self.temp_drift = random.uniform(-0.03, 0.03)  # Minimal drift
+        self.pressure_drift = random.uniform(-0.02, 0.02)  # Minimal drift
         
-        # Failure simulation parameters (reduced for fewer critical alerts)
-        self.failure_probability = 0.0002  # 0.02% chance per reading (reduced from 0.1%)
+        # Failure simulation parameters (very rare failures)
+        self.failure_probability = 0.00005  # 0.005% chance per reading (very rare)
         self.maintenance_required = False
         
     def generate_sensor_readings(self) -> Dict:
@@ -57,10 +57,10 @@ class IoTDevice:
                 "maintenance_required": self.maintenance_required
             }
         
-        # Simulate realistic variations (reduced noise for more stable readings)
-        current_noise = random.uniform(-1.0, 1.0)  # Reduced from ±2.0
-        temp_noise = random.uniform(-1.5, 1.5)  # Reduced from ±3.0
-        pressure_noise = random.uniform(-0.15, 0.15)  # Reduced from ±0.3
+        # Simulate realistic variations (minimal noise for stable readings)
+        current_noise = random.uniform(-0.5, 0.5)  # Minimal noise
+        temp_noise = random.uniform(-0.8, 0.8)  # Minimal noise
+        pressure_noise = random.uniform(-0.1, 0.1)  # Minimal noise
         
         # Apply drift over time
         self.base_current += self.current_drift * 0.01
@@ -76,16 +76,16 @@ class IoTDevice:
         temperature = self.base_temperature + temp_noise
         pressure = max(0, self.base_pressure + pressure_noise)
         
-        # Simulate occasional equipment stress/failure (reduced severity)
+        # Simulate occasional equipment stress/failure (minimal severity for rare cases)
         if random.random() < self.failure_probability:
             if random.choice([True, False]):
-                # Overheat scenario (reduced severity)
-                temperature += random.uniform(8, 15)  # Reduced from 15-30
-                current += random.uniform(3, 8)  # Reduced from 5-15
+                # Mild overheat scenario
+                temperature += random.uniform(5, 10)  # Mild increase
+                current += random.uniform(2, 5)  # Mild increase
             else:
-                # Pressure spike scenario (reduced severity)
-                pressure += random.uniform(1, 3)  # Reduced from 2-5
-                current += random.uniform(2, 5)  # Reduced from 3-8
+                # Mild pressure spike scenario
+                pressure += random.uniform(0.5, 2)  # Mild increase
+                current += random.uniform(1, 3)  # Mild increase
             
             self.maintenance_required = True
         
