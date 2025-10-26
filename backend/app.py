@@ -143,23 +143,38 @@ def clear_offline_devices():
     try:
         db = get_db()
         
-        # Delete devices offline for more than 30 seconds
-        thirty_seconds_ago = (datetime.now() - timedelta(seconds=30)).isoformat()
+        # Check if force parameter is provided
+        force = request.args.get('force', 'false').lower() == 'true'
         
-        # Delete from device_status
-        cursor = db.execute('''
-            DELETE FROM device_status 
-            WHERE last_seen < ?
-        ''', (thirty_seconds_ago,))
-        
-        deleted_count = cursor.rowcount
-        db.commit()
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Cleared {deleted_count} offline devices",
-            "deleted_count": deleted_count
-        })
+        if force:
+            # Force delete ALL devices
+            cursor = db.execute('DELETE FROM device_status')
+            deleted_count = cursor.rowcount
+            db.commit()
+            
+            return jsonify({
+                "status": "success",
+                "message": f"Force cleared ALL {deleted_count} devices",
+                "deleted_count": deleted_count
+            })
+        else:
+            # Delete devices offline for more than 30 seconds
+            thirty_seconds_ago = (datetime.now() - timedelta(seconds=30)).isoformat()
+            
+            # Delete from device_status
+            cursor = db.execute('''
+                DELETE FROM device_status 
+                WHERE last_seen < ?
+            ''', (thirty_seconds_ago,))
+            
+            deleted_count = cursor.rowcount
+            db.commit()
+            
+            return jsonify({
+                "status": "success",
+                "message": f"Cleared {deleted_count} offline devices",
+                "deleted_count": deleted_count
+            })
     except Exception as e:
         logger.error(f"Error clearing offline devices: {e}")
         return jsonify({
