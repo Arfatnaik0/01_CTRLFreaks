@@ -322,10 +322,10 @@ def get_all_device_status():
         devices = [dict(row) for row in cursor.fetchall()]
         db.close()
         
-        # Filter out devices that have been offline for more than 1 minute
+        # Filter out devices that have been offline for more than 10 seconds
         # This will make them disappear from the dashboard
-        one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
-        active_devices = [d for d in devices if d['last_seen'] > one_minute_ago]
+        ten_seconds_ago = (datetime.now() - timedelta(seconds=10)).isoformat()
+        active_devices = [d for d in devices if d['last_seen'] > ten_seconds_ago]
         
         return active_devices
         
