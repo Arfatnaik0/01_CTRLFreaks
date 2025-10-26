@@ -167,6 +167,37 @@ def clear_offline_devices():
             "message": str(e)
         }), 500
 
+@app.route('/api/clear-all-devices', methods=['POST'])
+def clear_all_devices():
+    """Clear ALL device data - use this to reset the system"""
+    try:
+        db = get_db()
+        
+        # Count before deletion
+        count_cursor = db.execute('SELECT COUNT(*) FROM device_status')
+        device_count = count_cursor.fetchone()[0]
+        
+        readings_cursor = db.execute('SELECT COUNT(*) FROM sensor_readings')
+        readings_count = readings_cursor.fetchone()[0]
+        
+        # Delete all devices and readings
+        db.execute('DELETE FROM device_status')
+        db.execute('DELETE FROM sensor_readings')
+        db.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "All device data cleared",
+            "devices_deleted": device_count,
+            "readings_deleted": readings_count
+        })
+    except Exception as e:
+        logger.error(f"Error clearing all devices: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
 @app.route('/api/init-db')
 def init_database():
     """Initialize database - useful for production deployment"""
