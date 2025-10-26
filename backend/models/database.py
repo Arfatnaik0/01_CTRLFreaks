@@ -395,24 +395,36 @@ def get_all_device_status():
         # Auto-cleanup: Delete devices that haven't sent data in 1 minute
         one_minute_ago = (datetime.now() - timedelta(minutes=1)).isoformat()
         
-        # Delete old sensor readings first
-        db.execute('''
-            DELETE FROM sensor_readings 
-            WHERE device_id IN (
-                SELECT device_id FROM device_status WHERE last_seen < ?
-            )
+        logger.info(f"Checking for devices to cleanup. Threshold: {one_minute_ago}")
+        
+        # First, check how many devices would be deleted
+        count_cursor = db.execute('''
+            SELECT COUNT(*) as count FROM device_status WHERE last_seen < ?
         ''', (one_minute_ago,))
+        devices_to_delete = count_cursor.fetchone()[0]
         
-        # Delete old device status records
-        deleted = db.execute('''
-            DELETE FROM device_status 
-            WHERE last_seen < ?
-        ''', (one_minute_ago,))
-        
-        db.commit()
-        
-        if db.total_changes > 0:
-            logger.info(f"Auto-cleaned up {db.total_changes} offline devices")
+        if devices_to_delete > 0:
+            logger.info(f"Found {devices_to_delete} devices to delete (last_seen < {one_minute_ago})")
+            
+            # Delete old sensor readings first
+            db.execute('''
+                DELETE FROM sensor_readings 
+                WHERE device_id IN (
+                    SELECT device_id FROM device_status WHERE last_seen < ?
+                )
+            ''', (one_minute_ago,))
+            
+            # Delete old device status records
+            db.execute('''
+                DELETE FROM device_status 
+                WHERE last_seen < ?
+            ''', (one_minute_ago,))
+            
+            db.commit()
+            
+            logger.info(f"Successfully deleted {devices_to_delete} offline devices")
+        else:
+            logger.info("No offline devices to cleanup")
         
         # Now get only active devices
         cursor = db.execute('''
@@ -430,12 +442,13 @@ def get_all_device_status():
         ''', (offline_threshold, offline_threshold))
         
         devices = [dict(row) for row in cursor.fetchall()]
+        logger.info(f"Returning {len(devices)} devices after cleanup")
         db.close()
         
         return devices
         
     except Exception as e:
-        logger.error(f"Error getting device status: {e}")
+        logger.error(f"Error getting device status: {e}", exc_info=True)
         return []
 
 def cleanup_offline_devices():
