@@ -98,7 +98,7 @@ def control_device(device_id):
 
 @control_bp.route('/device/<device_id>/relay', methods=['PUT'])
 def toggle_relay(device_id):
-    """Toggle device relay (ON/OFF) with persistent state"""
+    """Toggle device relay (ON/OFF) with persistent state (backward compatible)"""
     try:
         data = request.get_json()
         status = data.get('relay_status') or data.get('status', 'ON')
@@ -106,24 +106,44 @@ def toggle_relay(device_id):
         if status not in ['ON', 'OFF']:
             return jsonify({"error": "Invalid status. Use 'ON' or 'OFF'"}), 400
         
-        # Save manual override in database
-        db = sqlite3.connect('iot_data.db')
+        # Save manual override in database with backward compatibility
+        db = sqlite3.connect('iot_data.db', timeout=10)
         
-        # Update or insert manual override
-        db.execute('''
-            UPDATE device_status 
-            SET manual_override = ?, relay_status = ?, updated_at = datetime('now')
-            WHERE device_id = ?
-        ''', (status, status, device_id))
-        
-        # If device doesn't exist yet, create it
-        if db.total_changes == 0:
+        # Try to update with manual_override column first
+        try:
+            # Update or insert manual override
             db.execute('''
-                INSERT OR IGNORE INTO device_status 
-                (device_id, last_seen, current_status, relay_status, manual_override, 
-                 device_type, is_active, updated_at)
-                VALUES (?, datetime('now'), 'online', ?, ?, 'unknown', 1, datetime('now'))
-            ''', (device_id, status, status))
+                UPDATE device_status 
+                SET manual_override = ?, relay_status = ?, updated_at = datetime('now')
+                WHERE device_id = ?
+            ''', (status, status, device_id))
+            
+            # If device doesn't exist yet, create it
+            if db.total_changes == 0:
+                db.execute('''
+                    INSERT OR IGNORE INTO device_status 
+                    (device_id, last_seen, current_status, relay_status, manual_override, 
+                     device_type, is_active, updated_at)
+                    VALUES (?, datetime('now'), 'online', ?, ?, 'unknown', 1, datetime('now'))
+                ''', (device_id, status, status))
+        
+        except sqlite3.OperationalError as e:
+            # Column doesn't exist yet - use fallback without manual_override
+            logger.warning(f"manual_override column not found, using fallback: {e}")
+            db.execute('''
+                UPDATE device_status 
+                SET relay_status = ?, updated_at = datetime('now')
+                WHERE device_id = ?
+            ''', (status, device_id))
+            
+            # If device doesn't exist yet, create it without manual_override
+            if db.total_changes == 0:
+                db.execute('''
+                    INSERT OR IGNORE INTO device_status 
+                    (device_id, last_seen, current_status, relay_status, 
+                     device_type, is_active, updated_at)
+                    VALUES (?, datetime('now'), 'online', ?, 'unknown', 1, datetime('now'))
+                ''', (device_id, status))
         
         db.commit()
         db.close()
@@ -139,17 +159,17 @@ def toggle_relay(device_id):
         global pending_commands
         pending_commands.append(command)
         
-        logger.info(f"Manual override set for device {device_id}: {status}")
+        logger.info(f"Relay toggled for device {device_id}: {status}")
         
         return jsonify({
             "status": "success",
-            "message": f"Device {device_id} manually set to {status}",
+            "message": f"Device {device_id} has been turned {status.lower()} successfully",
             "command": command
         }), 200
     
     except Exception as e:
-        logger.error(f"Error toggling relay: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        logger.error(f"Error toggling relay for {device_id}: {e}", exc_info=True)
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 @control_bp.route('/bulk-control', methods=['POST'])
 def bulk_control():
